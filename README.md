@@ -123,7 +123,19 @@ APP_ENV=local uvicorn services.api.main:app --reload
 ```
 
 Seeded stub logins (local only, never in prod): `analyst@occdesk.example` / `manager@occdesk.example`,
-password `occdesk-local`.
+password `occdesk-local`. Sign in at `/console/login`.
+
+### The console
+
+| Page | What it is |
+|---|---|
+| `/console` | the ranked worklist, refreshed by an HTMX fragment every 5 s |
+| `/console/reports/{id}` | one report: the four ranking terms, hazards, linked flight, narrative, and NASA's coded fields verbatim |
+| `/console/upload` | hashes the file in the browser, uploads straight to S3, then calls `complete` |
+| `/console/login` | sign in; the token lives in `localStorage` and every HTMX request carries it |
+
+Page shells carry no data. A browser navigation cannot send a bearer token, so each page loads
+an **authenticated fragment** — the fragments are protected exactly like the API they render.
 
 ---
 
@@ -145,6 +157,11 @@ Version prefix `/api/v1`. Every response carries `X-Request-Id`. Errors are RFC 
 | PATCH | `/reports/{id}/assign` | **manager** | 403 for analyst — and there is a test for that |
 | GET | `/queue/stats` | manager | `{visible, in_flight, workers, throughput_per_min, drain_eta_seconds}` |
 | GET | `/healthz` `/readyz` `/metrics` | — | liveness (checks nothing), readiness (DB + SQS), Prometheus |
+
+`/metrics` publishes `occdesk_http_request_duration_seconds`, a histogram labelled by method,
+**route template** and status — the template, never the raw path, because labelling by raw path
+would mint a time series per report id. One bucket edge sits exactly on 0.2 s so the p95 SLO
+query is a division rather than an interpolation.
 
 **Presigned POST, not PUT.** POST can enforce `content-length-range` and `Content-Type`
 in the policy, so a 400 MB file is rejected by S3 before it costs us a request.

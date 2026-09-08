@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Response
 
+from services.api import metrics
 from services.api.deps import settings
 from services.api.schemas import Health, Readiness
 from services.common import aws
@@ -55,15 +56,12 @@ def _check_queue(s: Settings) -> bool:
 
 
 @router.get("/metrics")
-def metrics() -> Response:
-    """Prometheus text exposition.
+def prometheus_metrics() -> Response:
+    """Prometheus text exposition, served unauthenticated for the scraper.
 
-    Placeholder counters until the middleware histogram lands in M2 - an endpoint that returns
-    a plausible-looking fake number would be worse than one that returns almost nothing.
+    On AWS this path is not exposed through the public ALB listener - it is scraped inside the
+    VPC. That is Wasim's listener rule; the endpoint itself deliberately has no token check,
+    because a scraper that needs a JWT is a scraper that stops working at 3am.
     """
-    body = (
-        "# HELP occdesk_build_info Build information\n"
-        "# TYPE occdesk_build_info gauge\n"
-        "occdesk_build_info 1\n"
-    )
-    return Response(content=body, media_type="text/plain; version=0.0.4")
+    body, content_type = metrics.render()
+    return Response(content=body, media_type=content_type)

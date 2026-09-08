@@ -29,8 +29,12 @@ async function sha256Hex(buf) {
 document.getElementById("go").onclick = async () => {
   const f = document.getElementById("file").files[0];
   if (!f) return say("No file selected.");
-  const token = localStorage.getItem("occdesk_token");
-  if (!token) return say("Not signed in. POST /auth/login first — auth UI lands with M1.");
+  const token = Session.token;
+  if (!token || Session.expired()) {
+    say("Not signed in.");
+    location.href = "/console/login?next=/console/upload";
+    return;
+  }
 
   say("Hashing…");
   const sha256 = await sha256Hex(await f.arrayBuffer());

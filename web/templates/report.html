@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Report &middot; Occurrence Desk{% endblock %}
+{% block content %}
+<p class="muted"><a href="/console">&larr; worklist</a></p>
+<div id="report"
+     hx-get="/console/fragments/report/{{ report_id }}"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+  <span class="muted">loading&hellip;</span>
+</div>
+{% endblock %}

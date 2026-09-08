@@ -11,9 +11,10 @@ Format: `| date | what | value | command | who |`
 | Date | What | Value | Command | Who |
 |---|---|---|---|---|
 | 2026-09-08 | Contract + implementation agree (no drift) | 6/6 conformance tests pass | `pytest tests/contract/test_spec_conformance.py` | Nisarg |
-| 2026-09-08 | API test suite, M1 stub repository | 56 passed | `pytest -q` | Nisarg |
+| 2026-09-08 | API test suite, M1 stub repository | 77 passed, 2 skipped (e2e — needs a live stack) | `pytest` | Nisarg |
+| 2026-09-08 | `complete` handler cost, **in-process floor** — no network, S3, SQS or database | mean 4.18 ms, p50 4.02, p95 5.10, p99 6.35, max 35.37 (n=400, 25 warmup discarded) | `python tests/bench/bench_submit.py --iterations 400` | Nisarg |
 | 2026-09-08 | Lint and format | clean | `ruff check . && ruff format --check .` | Nisarg |
-| | `POST /documents/{id}/complete` p95 with 10,000 messages queued | **target < 200 ms** | Sowmya's Locust run, `services/replay/` | pending M2 |
+| | `POST /documents/{id}/complete` p95 with 10,000 messages queued | **target < 200 ms** — this is the number for the report; the 5.10 ms above is a floor, not a claim | Sowmya's Locust run, `services/replay/` | pending M2 |
 | | Worklist page 1 render at 50,000 reports | **target < 500 ms** | `tests/e2e/test_worklist_latency.py` | pending M2 |
 | | Worklist page 100 render at 50,000 reports | **target < 500 ms** | same | pending M2 |
 | | `GET /queue/stats` SQS call rate under a 1 Hz console poll | **target ≤ 0.2 calls/s** (5 s cache) | CloudWatch `NumberOfEmptyReceives` | pending M2 |
@@ -54,6 +55,19 @@ Format: `| date | what | value | command | who |`
 | | `make cloud-down` then restore, wall time | rehearse in week 8, not at 1am | `time make cloud-down` | pending |
 | | CI wall time | **target < 8 min** | GitHub Actions run summary | pending |
 | | Month-to-date cost by service | **every Friday** | Cost Explorer, grouped by service | pending |
+
+## Reading the floor number honestly
+
+The benchmark row above measures **our handler and nothing else**: FastAPI routing, JWT decode,
+the row write and the message construction, with the stub repository, in the same process, on a
+container that is not the one we deploy to. It does not include a network hop, an S3 presign, an
+SQS `SendMessage`, RDS latency, or any contention. It cannot tell you what the service does
+under load and it is not the p95 in our definition of done.
+
+It is still worth recording, for one reason: it says how much of the 200 ms budget our own code
+spends. About 5 ms of 200 means the budget is dominated by everything *around* the handler, so
+if the deployed p95 comes back at 180 ms we should look at SQS, the presign, and the ALB before
+we look at this code. That is a useful thing to know before the replay, not after it.
 
 ## Notes
 

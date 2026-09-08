@@ -49,8 +49,55 @@
       <a href="/console/upload">Upload</a>
       <a href="/docs">API</a>
     </nav>
-    <span class="muted" style="margin-left:auto">aviation safety report triage</span>
+    <span class="muted" style="margin-left:auto" id="whoami">not signed in</span>
+    <a href="/console/login" class="muted" id="signin-link">sign in</a>
   </header>
   <main>{% block content %}{% endblock %}</main>
+
+  <script>
+  // One place decides how the console holds a token, so no page invents its own scheme.
+  const Session = {
+    key: "occdesk_token",
+    get token() { try { return localStorage.getItem(this.key); } catch { return null; } },
+    set token(v) { try { v ? localStorage.setItem(this.key, v) : localStorage.removeItem(this.key); } catch {} },
+    claims() {
+      const t = this.token;
+      if (!t) return null;
+      try { return JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))); }
+      catch { return null; }
+    },
+    expired() {
+      const c = this.claims();
+      return !c || (c.exp && c.exp * 1000 <= Date.now());
+    },
+  };
+
+  // Every HTMX request carries the bearer token. The fragments are authenticated exactly like
+  // the API they render, so this is not optional decoration.
+  document.body.addEventListener("htmx:configRequest", (e) => {
+    if (Session.token) e.detail.headers["Authorization"] = `Bearer ${Session.token}`;
+  });
+
+  // A 401 on a fragment means the token aged out mid-shift. Say so and send them to sign in,
+  // rather than leaving an empty table that looks like "no reports".
+  document.body.addEventListener("htmx:responseError", (e) => {
+    if (e.detail.xhr.status === 401) {
+      Session.token = null;
+      location.href = "/console/login?next=" + encodeURIComponent(location.pathname);
+    }
+  });
+
+  (function renderIdentity() {
+    const c = Session.claims();
+    const who = document.getElementById("whoami");
+    const link = document.getElementById("signin-link");
+    if (c && !Session.expired()) {
+      who.textContent = `${c.email} · ${c.role}`;
+      link.textContent = "sign out";
+      link.href = "#";
+      link.onclick = (ev) => { ev.preventDefault(); Session.token = null; location.reload(); };
+    }
+  })();
+  </script>
 </body>
 </html>

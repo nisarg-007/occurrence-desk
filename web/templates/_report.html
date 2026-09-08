@@ -1,0 +1,89 @@
+<div class="card">
+  <div style="display:flex;align-items:baseline;gap:1rem">
+    <span class="pri {% if why.priority >= 70 %}pri-hi{% elif why.priority >= 40 %}pri-mid{% else %}pri-lo{% endif %}"
+          style="font-size:2rem">{{ why.priority }}</span>
+    <div>
+      <strong>ACN {{ r.acn }}</strong>
+      <span class="muted">{{ r.report_date or "undated" }} &middot; {{ r.state }}</span><br>
+      <span class="muted">{{ r.synopsis or "no synopsis" }}</span>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <strong>Why is this here?</strong>
+  <span class="muted"><code>{{ why.formula }}</code></span>
+  <table style="margin-top:.75rem">
+    <thead><tr><th>Term</th><th style="width:5rem">Weight</th><th style="width:6rem">Value</th>
+      <th style="width:6rem">Product</th><th>Meaning</th></tr></thead>
+    <tbody>
+      {% for t in why.terms %}
+      <tr>
+        <td><code>{{ t.name }}</code></td>
+        <td class="pri">{{ "%.2f"|format(t.weight) }}</td>
+        <td class="pri">{{ "%.3f"|format(t.value) }}</td>
+        <td class="pri">{{ "%.3f"|format(t.product) }}</td>
+        <td class="muted">{{ t.explanation }}</td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td colspan="3" class="muted">sum &times; 100</td>
+        <td class="pri">{{ why.priority }}</td>
+        <td class="muted">the number on the worklist row</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <strong>Hazards</strong>
+  <p>
+    {% for h in r.hazards %}
+      <span class="chip">{{ h.label }} &middot; {{ h.source }} {{ "%.2f"|format(h.confidence) }}</span>
+    {% else %}<span class="muted">none assigned</span>{% endfor %}
+  </p>
+  <span class="muted">
+    <code>nasa</code> rows are NASA analysts' own codes — the ground truth our accuracy number is
+    measured against. <code>model</code> rows are our prediction.
+  </span>
+</div>
+
+<div class="card">
+  <strong>Linked flight</strong>
+  {% if r.linked_flight %}
+    <p>{{ r.linked_flight.carrier }} · {{ r.linked_flight.flight_date }} ·
+       {{ r.linked_flight.origin }} → {{ r.linked_flight.dest }}
+       <span class="chip">confidence {{ "%.2f"|format(r.linked_flight.confidence) }}</span>
+       <span class="chip">{{ r.linked_flight.method }}</span></p>
+  {% else %}
+    <p class="muted">
+      No confident match. ASRS records are de-identified on purpose, so a link is probabilistic
+      and sometimes there is not one — saying so is the honest output, not a failure.
+    </p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <strong>Narrative</strong>
+  <p style="white-space:pre-wrap">{{ r.narrative }}</p>
+</div>
+
+{% if r.coded %}
+<div class="card">
+  <strong>Coded fields</strong>
+  <span class="muted">NASA's dotted paths, verbatim — not snake-cased, so this page can be
+  checked line by line against the printed PDF.</span>
+  <table style="margin-top:.75rem">
+    {% for section, fields in r.coded.items() %}
+      {% if fields is mapping %}
+        {% for path, value in fields.items() %}
+        <tr><td class="muted" style="width:22rem"><code>{{ section }}.{{ path }}</code></td>
+            <td>{{ value }}</td></tr>
+        {% endfor %}
+      {% else %}
+        <tr><td class="muted"><code>{{ section }}</code></td><td>{{ fields }}</td></tr>
+      {% endif %}
+    {% endfor %}
+  </table>
+</div>
+{% endif %}

@@ -7,6 +7,15 @@ The format is `YYYY-MM-DD - what changed - why - signed off by`.
 
 ## Unreleased
 
+- **2026-09-08** - No change to `openapi.yaml`. Recording two things other lanes now depend on:
+  **(1)** `/metrics` publishes `occdesk_http_request_duration_seconds` (histogram; labels
+  `method`, `route`, `status`; bucket edges include `0.2`) and
+  `occdesk_documents_submitted_total{enqueued}`. Sowmya's dashboard and alarms read those names,
+  so renaming one is a contract change and comes here first.
+  **(2)** The console's HTMX fragments under `/console/fragments/` require the same bearer token
+  as the API they render, and are deliberately absent from the OpenAPI document - they are not
+  a public interface and nobody should code against them. - Nisarg
+
 ## 1.0.0 - 2026-09-08
 
 - **2026-09-08** - Initial `openapi.yaml` (v1.0.0), `queue-message.schema.json` (schema_version 1),

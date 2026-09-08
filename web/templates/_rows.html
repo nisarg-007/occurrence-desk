@@ -3,9 +3,9 @@
   <td class="pri {% if r.priority >= 70 %}pri-hi{% elif r.priority >= 40 %}pri-mid{% else %}pri-lo{% endif %}">
     {{ r.priority }}
   </td>
-  <td><a href="{{ api_prefix }}/reports/{{ r.id }}">{{ r.acn }}</a></td>
+  <td><a href="/console/reports/{{ r.id }}">{{ r.acn }}</a></td>
   <td>{{ r.synopsis or "—" }}
-      <a class="muted" href="{{ api_prefix }}/reports/{{ r.id }}/why" title="why is this here?">why</a></td>
+      <a class="muted" href="/console/reports/{{ r.id }}" title="why is this here?">why</a></td>
   <td>{% for h in r.hazards %}<span class="chip">{{ h.label }}</span>{% endfor %}</td>
   <td class="muted">{{ r.report_date or "—" }}</td>
   <td><span class="chip">{{ r.state }}</span></td>
