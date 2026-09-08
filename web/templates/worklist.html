@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Worklist &middot; Occurrence Desk{% endblock %}
+{% block content %}
+<div class="card">
+  <strong>Ranked queue.</strong>
+  <span class="muted">
+    Ordered by <code>priority DESC, report_date DESC, id DESC</code>, keyset paged &mdash; page 100
+    costs the same as page 1. Priority is
+    <code>100 &times; (0.45&middot;severity + 0.25&middot;link + 0.20&middot;recency + 0.10&middot;flag)</code>;
+    open <code>/why</code> on any row for the four terms.
+  </span>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:4rem">Pri</th>
+      <th style="width:7rem">ACN</th>
+      <th>Synopsis</th>
+      <th style="width:9rem">Hazard</th>
+      <th style="width:7rem">Date</th>
+      <th style="width:6rem">State</th>
+    </tr>
+  </thead>
+  <tbody id="worklist"
+         hx-get="/console/fragments/worklist"
+         hx-trigger="load, every 5s"
+         hx-swap="innerHTML">
+    <tr><td colspan="6" class="muted">loading&hellip;</td></tr>
+  </tbody>
+</table>
+{% endblock %}

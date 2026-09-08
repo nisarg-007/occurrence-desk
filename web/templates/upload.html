@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Upload &middot; Occurrence Desk{% endblock %}
+{% block content %}
+<div class="card">
+  <strong>Two-step upload.</strong>
+  <span class="muted">
+    The browser hashes the file, asks for a presigned POST, uploads straight to S3, then calls
+    <code>complete</code>. The API never sees the bytes, and <code>complete</code> returns
+    <strong>202</strong> without opening the PDF.
+  </span>
+</div>
+
+<div class="card">
+  <input type="file" id="file" accept="application/pdf">
+  <button id="go">Upload</button>
+  <p id="out" class="muted">Choose an ASRS report set PDF.</p>
+</div>
+
+<script>
+const API = "{{ api_prefix }}";
+const out = document.getElementById("out");
+const say = (m) => { out.textContent = m; };
+
+async function sha256Hex(buf) {
+  const digest = await crypto.subtle.digest("SHA-256", buf);
+  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+document.getElementById("go").onclick = async () => {
+  const f = document.getElementById("file").files[0];
+  if (!f) return say("No file selected.");
+  const token = localStorage.getItem("occdesk_token");
+  if (!token) return say("Not signed in. POST /auth/login first — auth UI lands with M1.");
+
+  say("Hashing…");
+  const sha256 = await sha256Hex(await f.arrayBuffer());
+
+  say("Requesting a presigned POST…");
+  const r1 = await fetch(`${API}/documents/upload-url`, {
+    method: "POST",
+    headers: {"content-type": "application/json", authorization: `Bearer ${token}`},
+    body: JSON.stringify({filename: f.name, byte_size: f.size, sha256})
+  });
+  if (!r1.ok) return say(`upload-url failed: ${r1.status}`);
+  const {document_id, url, fields, duplicate} = await r1.json();
+
+  if (!duplicate) {
+    say("Uploading to object storage…");
+    const form = new FormData();
+    Object.entries(fields).forEach(([k, v]) => form.append(k, v));
+    form.append("file", f);
+    const r2 = await fetch(url, {method: "POST", body: form});
+    if (!r2.ok && r2.status !== 204) return say(`S3 rejected the upload: ${r2.status}`);
+  }
+
+  const r3 = await fetch(`${API}/documents/${document_id}/complete`, {
+    method: "POST", headers: {authorization: `Bearer ${token}`}
+  });
+  const body = await r3.json();
+  say(`${r3.status} ${r3.status === 202 ? "Accepted" : ""} — document ${document_id}, `
+      + `enqueued=${body.enqueued}${duplicate ? " (duplicate: same sha256, one row)" : ""}. `
+      + `trace_id ${body.trace_id}`);
+};
+</script>
+{% endblock %}

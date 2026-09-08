@@ -1,0 +1,574 @@
+openapi: 3.1.0
+info:
+  title: Occurrence Desk API
+  version: 1.0.0
+  description: |
+    Aviation safety report triage.
+
+    **Contract rules.** This file is the contract every lane codes against. It changes by
+    pull request only, never by chat message: open a PR on `contracts/`, tag Nisarg, and add
+    a dated line to `contracts/CHANGELOG.md`.
+
+    **Invariants that are not negotiable.**
+    - `POST /documents/{id}/complete` returns **202** in under 200 ms at p95, always. It writes
+      a row, sends one SQS message, and returns. It never opens a PDF.
+    - Every response carries `X-Request-Id`, and the same value appears as `trace_id` on every
+      log line from submit through parse.
+    - Errors are RFC 7807 `application/problem+json`.
+    - Collections are **keyset** paged. There is no `offset` parameter and there will not be one.
+  contact:
+    name: Nisarg - Application, API & Integration
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: local (docker compose)
+  - url: https://dev.occdesk.example/api/v1
+    description: dev (ALB) [verify hostname once Wasim's ACM cert is issued]
+
+tags:
+  - name: auth
+  - name: documents
+  - name: reports
+  - name: queue
+  - name: ops
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Exchange email and password for a JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Token issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /documents/upload-url:
+    post:
+      tags: [documents]
+      summary: Reserve a document row and return a presigned S3 POST
+      description: |
+        Presigned **POST**, not PUT: POST can enforce `content-length-range` and `Content-Type`
+        in the policy, so an oversized file is rejected by S3 before it costs us a request.
+        The object key is content-addressed - `raw/<yyyy>/<mm>/<dd>/<sha256>.pdf` - so the same
+        PDF always lands on the same key and a duplicate upload overwrites itself.
+        If `sha256` is already known, the existing `document_id` is returned (idempotent).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UploadUrlRequest' }
+      responses:
+        '200':
+          description: Presigned POST issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UploadUrlResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /documents/{document_id}/complete:
+    post:
+      tags: [documents]
+      summary: Mark the upload finished and enqueue the parse
+      description: |
+        Sets `status='queued'`, sends exactly one message to the parse queue, returns 202.
+        Submitting the same document twice is normal, not exceptional: the second call also
+        returns 202 and does not enqueue a second message.
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '202':
+          description: Accepted for processing
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AcceptedResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The object is not present in S3 yet
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /documents/{document_id}:
+    get:
+      tags: [documents]
+      summary: Document status and the reports extracted from it
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: Document
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Document' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /reports:
+    get:
+      tags: [reports]
+      summary: The ranked worklist, keyset paged
+      description: |
+        Ordered by `(priority DESC, report_date DESC, id DESC)`. Page forward with the opaque
+        `cursor` returned as `next_cursor`. There is deliberately no `offset`: `OFFSET 50000`
+        reads fifty thousand rows and throws them away, which is exactly when the console goes
+        dark under load.
+      parameters:
+        - { name: category,     in: query, schema: { type: string },  description: hazard category code }
+        - { name: state,        in: query, schema: { type: string, enum: [new, triaged, escalated, closed] } }
+        - { name: priority_min, in: query, schema: { type: integer, minimum: 0, maximum: 100 } }
+        - { name: flight_date,  in: query, schema: { type: string, format: date } }
+        - { name: q,            in: query, schema: { type: string }, description: full-text search over the narrative }
+        - { name: cursor,       in: query, schema: { type: string }, description: opaque keyset cursor from next_cursor }
+        - { name: page_size,    in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200':
+          description: A page of reports
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /reports/{report_id}:
+    get:
+      tags: [reports]
+      summary: One report - coded fields, narrative, hazards, linked flight
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      responses:
+        '200':
+          description: Report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /reports/{report_id}/why:
+    get:
+      tags: [reports]
+      summary: Explain the priority score
+      description: |
+        Returns the four weighted terms and their products. "Why is this one at the top?" is the
+        first question anyone asks about a ranking; a ranking nobody can explain gets ignored.
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      responses:
+        '200':
+          description: Score explanation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PriorityExplanation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /reports/{report_id}/disposition:
+    post:
+      tags: [reports]
+      summary: Record an analyst decision
+      description: An analyst may only dispose of reports assigned to them.
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DispositionRequest' }
+      responses:
+        '201':
+          description: Disposition recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Disposition' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /reports/{report_id}/assign:
+    patch:
+      tags: [reports]
+      summary: Assign a report to an analyst (manager only)
+      description: |
+        **Manager only.** An analyst token gets 403 here, and there is a negative test for it -
+        RBAC that was never tested negatively is RBAC that does not exist.
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignRequest' }
+      responses:
+        '200':
+          description: Assigned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /queue/stats:
+    get:
+      tags: [queue]
+      summary: Backlog, worker count and drain estimate (manager only)
+      description: |
+        `GetQueueAttributes` is cached in-process for 5 seconds so the console cannot hammer SQS.
+        `drain_eta_seconds` is `visible / max(throughput_per_min/60, epsilon)` with throughput
+        from a 60-second rolling count of parsed documents. When the estimate is not yet
+        meaningful the field is null and `estimating` is true - a wrong number is worse than
+        no number.
+      responses:
+        '200':
+          description: Queue statistics
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QueueStats' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /healthz:
+    get:
+      tags: [ops]
+      summary: Liveness - checks nothing on purpose
+      description: |
+        Deliberately checks no dependency. If readiness and liveness are the same endpoint, one
+        slow query makes ECS kill healthy tasks in a loop.
+      security: []
+      responses:
+        '200':
+          description: Process is alive
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+  /readyz:
+    get:
+      tags: [ops]
+      summary: Readiness - database and queue reachable
+      security: []
+      responses:
+        '200':
+          description: Ready to serve traffic
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Readiness' }
+        '503':
+          description: A dependency is unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Readiness' }
+
+  /metrics:
+    get:
+      tags: [ops]
+      summary: Prometheus exposition
+      security: []
+      responses:
+        '200':
+          description: Metrics
+          content:
+            text/plain:
+              schema: { type: string }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    DocumentId:
+      name: document_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    ReportId:
+      name: report_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Authenticated, but the role does not permit this
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: No such resource
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PayloadTooLarge:
+      description: byte_size exceeds MAX_UPLOAD_BYTES
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ValidationError:
+      description: Request body failed validation
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Problem:
+      type: object
+      description: RFC 7807 problem details
+      required: [type, title, status]
+      properties:
+        type:     { type: string, format: uri, example: 'https://occdesk/errors/forbidden' }
+        title:    { type: string, example: Forbidden }
+        status:   { type: integer, example: 403 }
+        detail:   { type: string }
+        instance: { type: string }
+        request_id: { type: string }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:    { type: string, format: email }
+        password: { type: string, minLength: 8, writeOnly: true }
+
+    TokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in, role]
+      properties:
+        access_token: { type: string }
+        token_type:   { type: string, enum: [bearer] }
+        expires_in:   { type: integer, example: 3600 }
+        role:         { $ref: '#/components/schemas/Role' }
+
+    Role:
+      type: string
+      enum: [analyst, manager, admin]
+
+    UploadUrlRequest:
+      type: object
+      required: [filename, byte_size, sha256]
+      properties:
+        filename:  { type: string, example: nmac.pdf }
+        byte_size: { type: integer, minimum: 1, example: 1843200 }
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: lowercase hex digest of the file; the idempotency key
+
+    UploadUrlResponse:
+      type: object
+      required: [document_id, url, fields, expires_in, duplicate]
+      properties:
+        document_id: { type: integer, format: int64 }
+        url:         { type: string, format: uri }
+        fields:
+          type: object
+          additionalProperties: { type: string }
+          description: form fields that must be posted with the file, verbatim
+        expires_in:  { type: integer, example: 900 }
+        duplicate:
+          type: boolean
+          description: true when this sha256 was already known - the client may skip the upload
+
+    AcceptedResponse:
+      type: object
+      required: [document_id, status, enqueued]
+      properties:
+        document_id: { type: integer, format: int64 }
+        status:      { $ref: '#/components/schemas/DocumentStatus' }
+        enqueued:
+          type: boolean
+          description: false when the document was already queued or parsed (still 202)
+        trace_id:    { type: string }
+
+    DocumentStatus:
+      type: string
+      enum: [received, queued, parsing, parsed, failed]
+
+    Document:
+      type: object
+      required: [id, sha256, status, attempts, uploaded_at, reports]
+      properties:
+        id:                { type: integer, format: int64 }
+        sha256:            { type: string }
+        original_filename: { type: string }
+        byte_size:         { type: integer }
+        page_count:        { type: integer, nullable: true }
+        status:            { $ref: '#/components/schemas/DocumentStatus' }
+        attempts:          { type: integer }
+        error_text:        { type: string, nullable: true }
+        uploaded_at:       { type: string, format: date-time }
+        reports:
+          type: array
+          items: { $ref: '#/components/schemas/ReportSummary' }
+
+    ReportSummary:
+      type: object
+      required: [id, acn, priority, state]
+      properties:
+        id:          { type: integer, format: int64 }
+        acn:         { type: string, example: '2068539' }
+        report_date: { type: string, format: date, nullable: true }
+        synopsis:    { type: string, nullable: true }
+        priority:    { type: integer, minimum: 0, maximum: 100 }
+        state:       { type: string, enum: [new, triaged, escalated, closed] }
+        assigned_to: { type: integer, format: int64, nullable: true }
+        hazards:
+          type: array
+          items: { $ref: '#/components/schemas/Hazard' }
+
+    ReportDetail:
+      allOf:
+        - $ref: '#/components/schemas/ReportSummary'
+        - type: object
+          properties:
+            document_id: { type: integer, format: int64 }
+            narrative:   { type: string }
+            coded:
+              type: object
+              description: the full NASA field tree, verbatim - dotted paths are NOT snake-cased
+              additionalProperties: true
+            linked_flight: { $ref: '#/components/schemas/FlightLink' }
+
+    Hazard:
+      type: object
+      required: [code, label, confidence, source]
+      properties:
+        code:       { type: string, example: conflict_nmac }
+        label:      { type: string, example: Conflict - Near Midair Collision }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        source:
+          type: string
+          enum: [nasa, model]
+          description: nasa rows are ground truth; model rows are our prediction
+
+    FlightLink:
+      type: object
+      nullable: true
+      required: [flight_id, confidence, method]
+      properties:
+        flight_id:   { type: integer, format: int64 }
+        confidence:  { type: number, minimum: 0, maximum: 1 }
+        method:      { type: string, example: date+locale+type }
+        flight_date: { type: string, format: date }
+        carrier:     { type: string }
+        origin:      { type: string }
+        dest:        { type: string }
+
+    ReportPage:
+      type: object
+      required: [items, next_cursor, page_size]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ReportSummary' }
+        next_cursor:
+          type: string
+          nullable: true
+          description: pass back as `cursor`; null means this is the last page
+        page_size: { type: integer }
+
+    PriorityExplanation:
+      type: object
+      required: [report_id, priority, terms]
+      properties:
+        report_id: { type: integer, format: int64 }
+        priority:  { type: integer, minimum: 0, maximum: 100 }
+        formula:
+          type: string
+          example: 100 * (0.45*severity + 0.25*link + 0.20*recency + 0.10*manager_flag)
+        terms:
+          type: array
+          items:
+            type: object
+            required: [name, weight, value, product, explanation]
+            properties:
+              name:        { type: string, example: severity }
+              weight:      { type: number, example: 0.45 }
+              value:       { type: number, example: 0.9 }
+              product:     { type: number, example: 0.405 }
+              explanation: { type: string }
+
+    DispositionRequest:
+      type: object
+      required: [state]
+      properties:
+        state:    { type: string, enum: [new, triaged, escalated, closed] }
+        priority: { type: integer, minimum: 0, maximum: 100, nullable: true }
+        note:     { type: string, maxLength: 4000 }
+
+    Disposition:
+      type: object
+      required: [id, report_id, analyst_id, state, created_at]
+      properties:
+        id:         { type: integer, format: int64 }
+        report_id:  { type: integer, format: int64 }
+        analyst_id: { type: integer, format: int64 }
+        state:      { type: string, enum: [new, triaged, escalated, closed] }
+        priority:   { type: integer, nullable: true }
+        note:       { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    AssignRequest:
+      type: object
+      required: [analyst_id]
+      properties:
+        analyst_id:     { type: integer, format: int64 }
+        manager_flagged: { type: boolean, default: false }
+
+    QueueStats:
+      type: object
+      required: [visible, in_flight, workers, throughput_per_min, estimating]
+      properties:
+        visible:            { type: integer, description: ApproximateNumberOfMessagesVisible }
+        in_flight:          { type: integer, description: ApproximateNumberOfMessagesNotVisible }
+        oldest_message_age_seconds: { type: integer, nullable: true }
+        dlq_depth:          { type: integer }
+        workers:            { type: integer, description: ECS RunningTaskCount }
+        throughput_per_min: { type: number, description: parsed documents, 60s rolling }
+        drain_eta_seconds:  { type: integer, nullable: true }
+        estimating:
+          type: boolean
+          description: true when throughput is too small for the ETA to mean anything
+        cached_for_seconds: { type: integer, example: 5 }
+
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:  { type: string, enum: [ok] }
+        version: { type: string, description: git SHA of the running image }
+
+    Readiness:
+      type: object
+      required: [status, checks]
+      properties:
+        status: { type: string, enum: [ready, not_ready] }
+        checks:
+          type: object
+          properties:
+            database: { type: boolean }
+            queue:    { type: boolean }

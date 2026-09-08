@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://occdesk/contracts/extraction-record.schema.json",
+  "title": "One extracted ASRS record",
+  "description": "What the worker writes back for a single ACN block. NASA's dotted field paths are kept VERBATIM - not snake-cased, not tidied - so a human holding the PDF can check our extraction line by line.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["acn", "document_id", "page_from", "page_to", "coded", "fields", "narrative"],
+  "properties": {
+    "acn": {
+      "type": "string",
+      "pattern": "^[0-9]{4,10}$",
+      "description": "ASRS accession number; the record boundary and the second idempotency key"
+    },
+    "document_id": { "type": "integer", "minimum": 1 },
+    "page_from": { "type": "integer", "minimum": 1 },
+    "page_to": { "type": "integer", "minimum": 1 },
+    "report_date": { "type": ["string", "null"], "format": "date" },
+    "local_time_of_day": { "type": ["string", "null"], "example": "1201-1800" },
+    "coded": {
+      "type": "object",
+      "description": "the full NASA section tree, verbatim labels as keys",
+      "additionalProperties": true,
+      "examples": [
+        {
+          "Time / Day": { "Date": "202312", "Local Time Of Day": "1201-1800" },
+          "Place": { "Locale Reference.ATC Facility": "ZZZ.TRACON", "State Reference": "US" },
+          "Assessments": { "Primary Problem": "Human Factors" }
+        }
+      ]
+    },
+    "fields": {
+      "type": "array",
+      "description": "the same tree flattened to (path, value) pairs for report_fields",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "value"],
+        "properties": {
+          "path": { "type": "string", "example": "Assessments.Primary Problem" },
+          "value": { "type": "string", "example": "Human Factors" }
+        }
+      }
+    },
+    "narrative": { "type": "string", "minLength": 1 },
+    "synopsis": { "type": ["string", "null"] },
+    "hazards": {
+      "type": "array",
+      "description": "NASA Anomaly.* values, written to report_hazards with source='nasa' - these rows are the ground truth our accuracy number is measured against",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "confidence", "source"],
+        "properties": {
+          "code": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "source": { "enum": ["nasa", "model"] }
+        }
+      }
+    },
+    "parse": {
+      "type": "object",
+      "description": "worker telemetry; Sowmya's visibility timeout is derived from duration_ms p99",
+      "additionalProperties": false,
+      "properties": {
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "parser_version": { "type": "string" },
+        "gutter_x0": { "type": "number", "description": "derived from the data, then asserted in a test - never hard-coded" }
+      }
+    }
+  }
+}

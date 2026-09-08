@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Occurrence Desk{% endblock %}</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"
+          integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvWD79OC/LTtG6dMp+"
+          crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: #0f1115; --panel: #171a21; --line: #262b36; --text: #e6e9ef;
+      --muted: #93a0b5; --accent: #4c8dff; --hot: #ff5f56; --warm: #ffbd2e; --cool: #27c93f;
+    }
+    @media (prefers-color-scheme: light) {
+      :root { --bg:#f7f8fa; --panel:#fff; --line:#e3e6ec; --text:#12151b; --muted:#5c6779; }
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text);
+           font:15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+    header { display:flex; align-items:baseline; gap:1.5rem; padding:1rem 1.5rem;
+             border-bottom:1px solid var(--line); }
+    header h1 { font-size:1rem; margin:0; letter-spacing:.02em; }
+    header nav a { color:var(--muted); text-decoration:none; margin-right:1rem; }
+    header nav a:hover { color:var(--text); }
+    main { padding:1.5rem; max-width:1100px; }
+    table { width:100%; border-collapse:collapse; }
+    th { text-align:left; font-size:.75rem; text-transform:uppercase; letter-spacing:.06em;
+         color:var(--muted); padding:.5rem .75rem; border-bottom:1px solid var(--line); }
+    td { padding:.6rem .75rem; border-bottom:1px solid var(--line); vertical-align:top; }
+    tr:hover td { background:var(--panel); }
+    .pri { font-variant-numeric:tabular-nums; font-weight:600; }
+    .pri-hi { color:var(--hot); } .pri-mid { color:var(--warm); } .pri-lo { color:var(--muted); }
+    .chip { display:inline-block; padding:.1rem .5rem; border-radius:999px; font-size:.75rem;
+            border:1px solid var(--line); color:var(--muted); }
+    .muted { color:var(--muted); }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:10px;
+            padding:1rem 1.25rem; margin-bottom:1rem; }
+    button, .btn { background:var(--accent); color:#fff; border:0; border-radius:6px;
+                   padding:.5rem .9rem; font:inherit; cursor:pointer; }
+    code { background:var(--panel); padding:.1rem .35rem; border-radius:4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Occurrence Desk</h1>
+    <nav>
+      <a href="/console">Worklist</a>
+      <a href="/console/upload">Upload</a>
+      <a href="/docs">API</a>
+    </nav>
+    <span class="muted" style="margin-left:auto">aviation safety report triage</span>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>
