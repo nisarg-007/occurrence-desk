@@ -12,6 +12,8 @@ Format: `| date | what | value | command | who |`
 |---|---|---|---|---|
 | 2026-09-08 | Contract + implementation agree (no drift) | 6/6 conformance tests pass | `pytest tests/contract/test_spec_conformance.py` | Nisarg |
 | 2026-09-09 | API test suite, M1 stub repository | 85 passed, 2 skipped (e2e — needs a live stack) | `pytest` | Nisarg |
+| 2026-09-09 | API test suite, after the console dashboard (charts + latency reader + fragment) | 114 passed, 2 skipped | `pytest` | Nisarg |
+| 2026-09-09 | Dashboard rendered in Chromium, light + dark | 0 console errors, 0 failed requests, 4 charts, auto-signed-in with no login screen (`APP_ENV=local`) | `playwright` screenshot pass | Nisarg |
 | 2026-09-09 | Console redesign: contrast of every text/surface pair | worst pair **5.0:1** (light `--ink-3`), target 4.5:1 | `python3 /tmp/contrast.py`, values recorded in `web/static/css/console.css` | Nisarg |
 | 2026-09-09 | Console redesign: rendered in Chromium, light + dark, 4 pages | 0 console errors, 0 failed requests | `playwright` screenshot pass | Nisarg |
 | 2026-09-09 | Row link hit target | 63 × 28 px (desktop minimum 28 × 28) | `elementFromPoint` probe | Nisarg |
@@ -71,6 +73,17 @@ The rendered check matters as much as the computed one. Three defects in this pa
 visible in a screenshot: a fabricated Subresource Integrity hash that silently blocked htmx
 (the worklist said "loading" forever), a sticky table header that swallowed row clicks, and
 ranking bars squeezed to 91 px in a side column. None of them would have failed a unit test.
+
+Two more turned up the same way building the dashboard's bar charts: a value label (`94`) sat
+half-behind its own bar whenever that row was the chart's max, because the 12px gap reserved
+for the label was narrower than the label itself once it hit two digits; and a long hazard
+category name (`Deviation - Track / Heading`) ran straight into the bar next to it, because the
+label column's width was sized for the four short priority-band names and never re-checked
+against real category names. Both are geometry a unit test on the SVG string would pass without
+noticing — `test_charts.py` checks that a `<rect>` exists at all, not whether it overlaps a
+`<text>` next to it. Fixed by widening the label column, truncating with an ellipsis past 20
+characters (full name kept in `aria-label` and a `<title>` tooltip), and widening the value gap
+to clear a three-digit number.
 
 ## Reading the floor number honestly
 

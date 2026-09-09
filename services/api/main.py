@@ -16,13 +16,14 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from services.api import metrics, presentation, problems
+from services.api import charts, latency, metrics, presentation, problems
 from services.api.deps import analyst, get_repo
+from services.api.deps import settings as settings_dep
 from services.api.problems import ApiProblem, problem_response
 from services.api.routers import auth, documents, ops, queue, reports
-from services.api.security import Principal
+from services.api.security import Principal, issue_token
 from services.common import logging as jlog
-from services.common.settings import get_settings
+from services.common.settings import Settings, get_settings
 
 settings = get_settings()
 jlog.configure("api", settings.log_level)
@@ -37,6 +38,9 @@ app = FastAPI(
 
 API_PREFIX = "/api/v1"
 PAGE_SIZE = 25
+
+#: Sampled as the dashboard polls, so the latency line is this process's own measurements.
+LATENCY = latency.LatencyHistory()
 WEB = Path(__file__).resolve().parents[2] / "web"
 TEMPLATES = Jinja2Templates(directory=str(WEB / "templates"))
 
@@ -108,6 +112,33 @@ def console(request: Request):
     return TEMPLATES.TemplateResponse(
         request, "worklist.html", {"api_prefix": API_PREFIX, "nav": "worklist"}
     )
+
+
+@app.get("/console/dashboard", include_in_schema=False)
+def console_dashboard(request: Request):
+    return TEMPLATES.TemplateResponse(
+        request, "dashboard.html", {"api_prefix": API_PREFIX, "nav": "dashboard"}
+    )
+
+
+@app.get("/console/dev-session", include_in_schema=False)
+def dev_session(s: Settings = Depends(settings_dep)):
+    """A signed-in session without a login form - **local development only**.
+
+    Auth itself is not removed and is not weakened: the API still requires a bearer token on
+    every path, `require_role` still refuses an analyst on manager-only routes, and the
+    negative RBAC tests still run. This endpoint only spares us typing a password into our
+    own laptop. It 404s the moment APP_ENV is anything but 'local', and the console shows a
+    badge whenever it is in use, so nobody can mistake this for how the deployed system
+    behaves.
+    """
+    if not s.is_local:
+        raise problems.not_found("route")
+    return {
+        "access_token": issue_token(2, "manager@occdesk.example", "manager"),
+        "role": "manager",
+        "note": "local development session - APP_ENV=local only",
+    }
 
 
 @app.get("/console/login", include_in_schema=False)
@@ -252,6 +283,95 @@ def stats_fragment(
             "high_count": sum(1 for v in priorities if v >= 70),
             "top_priority": priorities[0] if priorities else None,
             "queue": queue,
+        },
+    )
+
+
+@app.get("/console/fragments/dashboard", include_in_schema=False)
+def dashboard_fragment(
+    request: Request,
+    p: Principal = Depends(analyst),
+    repo=Depends(get_repo),
+):
+    """Everything on the dashboard, computed here and drawn as SVG.
+
+    Rendering the charts on the server keeps the console consistent with itself: one
+    request returns a finished picture, there is no chart library to load, and the page
+    behaves the same with the network off.
+    """
+    import datetime as dt
+    from collections import Counter
+
+    rows = repo.list_reports(cursor=None, page_size=5000)
+    today = dt.date.today()
+    priorities = [repo.priority(r) for r in rows]
+
+    # --- priority distribution: four named bands, so the status palette is right here
+    band_counts = Counter(presentation.level(v)[1] for v in priorities)
+    band_colors = {
+        "Critical": "var(--sev-critical)",
+        "High": "var(--sev-high)",
+        "Moderate": "var(--sev-moderate)",
+        "Low": "var(--sev-low)",
+    }
+    bands = [
+        charts.Datum(label, band_counts.get(label, 0), band_colors[label])
+        for _, _, label in presentation.BANDS
+    ]
+
+    # --- hazard mix: one hue, labels carry identity, long tail folded into Other
+    hazard_counts = Counter(h["label"] for r in rows for h in r.hazards)
+    top = hazard_counts.most_common(7)
+    other = sum(hazard_counts.values()) - sum(c for _, c in top)
+    hazards = [charts.Datum(lab, n) for lab, n in top]
+    if other:
+        hazards.append(charts.Datum("Other", other))
+
+    # --- intake by month over the last 12 months
+    months, counts = [], []
+    for back in range(11, -1, -1):
+        anchor = (today.replace(day=1) - dt.timedelta(days=back * 30)).replace(day=1)
+        months.append(anchor.strftime("%b"))
+        counts.append(
+            sum(
+                1
+                for r in rows
+                if r.report_date
+                and (r.report_date.year, r.report_date.month) == (anchor.year, anchor.month)
+            )
+        )
+
+    # --- our own submit latency, read back out of the Prometheus histogram
+    LATENCY.observe()
+    sample = LATENCY.latest
+
+    return TEMPLATES.TemplateResponse(
+        request,
+        "_dashboard.html",
+        {
+            "is_stub": getattr(repo, "is_stub", False),
+            "total": len(rows),
+            "open_count": sum(1 for r in rows if r.state in ("new", "triaged")),
+            "critical": band_counts.get("Critical", 0),
+            "median": sorted(priorities)[len(priorities) // 2] if priorities else 0,
+            "unlinked_pct": (
+                round(100 * sum(1 for r in rows if not r.best_link_confidence) / len(rows))
+                if rows
+                else 0
+            ),
+            "bands_svg": charts.bars(bands, title="Reports by priority band"),
+            "hazards_svg": charts.bars(hazards, title="Reports by hazard category"),
+            "intake_svg": charts.columns(months, counts, title="Reports by month", every=2),
+            "latency_svg": charts.sparkline(
+                LATENCY.p95_series,
+                title="Submit latency p95",
+                threshold=latency.SLO_SECONDS * 1000,
+                threshold_label="200 ms target",
+            ),
+            "latency": sample,
+            "samples": len(LATENCY),
+            "bands": bands,
+            "hazards": hazards,
         },
     )
 

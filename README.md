@@ -153,8 +153,17 @@ password `occdesk-local`. Sign in at `/console/login`.
 |---|---|
 | `/console` | the ranked worklist, refreshed by an HTMX fragment every 5 s |
 | `/console/reports/{id}` | one report: the four ranking terms, hazards, linked flight, narrative, and NASA's coded fields verbatim |
+| `/console/dashboard` | priority distribution, hazard mix, intake by month, and this process's own measured submit latency — server-rendered SVG, no charting library, refreshed every 5 s |
 | `/console/upload` | hashes the file in the browser, uploads straight to S3, then calls `complete` |
 | `/console/login` | sign in; the token lives in `localStorage` and every HTMX request carries it |
+
+On a local build (`APP_ENV=local`) the console signs itself in automatically against a
+dedicated `/console/dev-session` endpoint, so there is no login screen to click through
+while developing. Auth itself is untouched — every fragment still requires the same bearer
+token and the same `require_role` checks, `/console/dev-session` just mints one instead of
+asking for a password, and it 404s the moment `APP_ENV` is anything else. The dashboard also
+says on screen when it's drawing the seeded demo dataset rather than real intake, so a chart
+that looks finished is never mistaken for one that means something yet.
 
 Priority is never communicated by colour alone: every score carries a band name in text
 (Critical / High / Moderate / Low) and a four-step meter, so the ranking survives colour

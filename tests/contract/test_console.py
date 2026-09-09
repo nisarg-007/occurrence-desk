@@ -12,8 +12,15 @@ FRAGMENTS = [
     "/console/fragments/worklist",
     "/console/fragments/report/1",
     "/console/fragments/stats",
+    "/console/fragments/dashboard",
 ]
-PAGES = ["/console", "/console/login", "/console/upload", "/console/reports/1"]
+PAGES = [
+    "/console",
+    "/console/login",
+    "/console/upload",
+    "/console/reports/1",
+    "/console/dashboard",
+]
 
 
 @pytest.mark.parametrize("path", FRAGMENTS)
@@ -106,3 +113,52 @@ def test_console_pages_are_not_in_the_public_api_document(client):
     """The console is not part of the contract other lanes code against."""
     paths = client.get("/openapi.json").json()["paths"]
     assert not [p for p in paths if p.startswith("/console")]
+
+
+def test_dashboard_fragment_shows_the_stub_banner(client, analyst_headers):
+    """The test client always runs against InMemoryRepo, so is_stub is always true here -
+    the banner must say so in words, not just imply it with a colour."""
+    body = client.get("/console/fragments/dashboard", headers=analyst_headers).text
+    assert "Demo data" in body
+
+
+def test_dashboard_fragment_charts_are_never_colour_alone(client, analyst_headers):
+    """Every chart is `role="img"` with an `aria-label` stating the real numbers, and the
+    priority-band chart also ships a text table fallback - a screen reader gets the same
+    information a sighted reader gets from the bars."""
+    body = client.get("/console/fragments/dashboard", headers=analyst_headers).text
+    assert body.count('role="img"') >= 3
+    assert "Reports by priority band" in body
+    assert "<table" in body
+
+
+def test_dashboard_page_shell_leaks_no_report_data(client):
+    """Same rule as the report page: the shell carries no data, only the authenticated
+    fragment does - a browser navigation cannot send a bearer token."""
+    body = client.get("/console/dashboard").text
+    assert 'role="img"' not in body
+
+
+def test_dev_session_mints_a_working_manager_token_locally(client):
+    """The local-only auto-sign-in endpoint hands out a token that is real, not a stub -
+    it works against an actual manager-only route."""
+    r = client.get("/console/dev-session")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["role"] == "manager"
+    headers = {"Authorization": f"Bearer {body['access_token']}"}
+    assert client.get("/console/fragments/stats", headers=headers).status_code == 200
+
+
+def test_dev_session_is_404_outside_a_local_build(client):
+    """Auth itself is not touched by this endpoint - it only exists at all when
+    APP_ENV=local, so a deployed build cannot mint a session by asking nicely."""
+    from services.api.deps import settings as settings_dep
+    from services.api.main import app
+    from services.common.settings import Settings
+
+    app.dependency_overrides[settings_dep] = lambda: Settings(app_env="production")
+    try:
+        assert client.get("/console/dev-session").status_code == 404
+    finally:
+        app.dependency_overrides.pop(settings_dep, None)

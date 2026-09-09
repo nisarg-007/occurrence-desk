@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Dashboard &middot; Occurrence Desk{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Dashboard</h1>
+    <p>Where the backlog stands, what kind of hazards are in it, and how fast the API answers.</p>
+  </div>
+</div>
+
+<div id="dashboard"
+     hx-get="/console/fragments/dashboard"
+     hx-trigger="load, every 5s"
+     hx-swap="innerHTML"
+     aria-live="polite" aria-busy="true">
+  <div class="card"><div class="card-body">
+    <span class="skeleton" style="width:40%;display:block"></span>
+  </div></div>
+</div>
+{% endblock %}

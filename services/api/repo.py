@@ -86,7 +86,11 @@ class Repository(Protocol):
 class InMemoryRepo:
     """M1 stub. Deliberately small and honest: it is not a database and does not pretend to be."""
 
-    def __init__(self, seed: bool = True) -> None:
+    #: True while the API is serving the in-memory stub rather than a database. The console
+    #: shows this on screen: numbers on a dashboard must never be mistaken for real results.
+    is_stub = True
+
+    def __init__(self, seed: bool = True, demo_rows: int = 140) -> None:
         self.users: dict[str, UserRow] = {}
         self.documents: dict[int, DocumentRow] = {}
         self.reports: dict[int, ReportRow] = {}
@@ -96,6 +100,7 @@ class InMemoryRepo:
             t: itertools.count(1) for t in ("users", "documents", "reports", "dispositions")
         }
         self._parsed_at: list[dt.datetime] = []
+        self.demo_rows = demo_rows
         if seed:
             self._seed()
 
@@ -152,17 +157,55 @@ class InMemoryRepo:
             page_count=112,
         )
         for acn, age, synopsis, sev, link, code, label in samples:
-            rid = self._next("reports")
-            self.reports[rid] = ReportRow(
-                id=rid,
-                document_id=doc_id,
-                acn=acn,
-                report_date=today - dt.timedelta(days=age),
-                synopsis=synopsis,
-                narrative=f"[stub narrative for ACN {acn} - real text arrives with Smit's parser]",
-                severity_weights=(sev,),
-                hazards=[{"code": code, "label": label, "confidence": 1.0, "source": "nasa"}],
-                best_link_confidence=link,
+            self._add_report(doc_id, acn, age, synopsis, sev, link, code, label)
+
+        self._seed_demo(doc_id, today)
+
+    def _add_report(self, doc_id, acn, age_days, synopsis, sev, link, code, label) -> int:
+        rid = self._next("reports")
+        self.reports[rid] = ReportRow(
+            id=rid,
+            document_id=doc_id,
+            acn=acn,
+            report_date=dt.date.today() - dt.timedelta(days=age_days),
+            synopsis=synopsis,
+            narrative=f"[stub narrative for ACN {acn} - real text arrives with Smit's parser]",
+            severity_weights=(sev,),
+            hazards=[{"code": code, "label": label, "confidence": 1.0, "source": "nasa"}],
+            best_link_confidence=link,
+        )
+        return rid
+
+    #: Hazard mix and severity weights, so the dashboard has a shape to draw before Smit's
+    #: parser exists. Deterministic (fixed seed) so two people looking at the demo see the
+    #: same picture, and labelled as stub data everywhere it is shown.
+    _DEMO_HAZARDS = (
+        ("conflict_nmac", "Conflict", 0.95, 9),
+        ("altitude_deviation", "Deviation - Altitude", 0.60, 22),
+        ("runway_incursion", "Ground Incursion", 0.90, 11),
+        ("track_heading", "Deviation - Track / Heading", 0.55, 18),
+        ("procedural", "Deviation - Procedural", 0.45, 24),
+        ("aircraft_equipment", "Aircraft Equipment", 0.35, 20),
+        ("atc_issue", "ATC Issue", 0.50, 14),
+        ("weather", "Inflight Weather Encounter", 0.40, 12),
+    )
+
+    def _seed_demo(self, doc_id: int, today: dt.date) -> None:
+        import random
+
+        rng = random.Random(42)
+        weights = [count for *_, count in self._DEMO_HAZARDS]
+        for n in range(self.demo_rows):
+            code, label, sev, _ = rng.choices(self._DEMO_HAZARDS, weights=weights)[0]
+            self._add_report(
+                doc_id,
+                acn=str(2_040_000 + n * 7),
+                age_days=rng.randint(0, 540),
+                synopsis=f"{label} reported by flight crew",
+                sev=min(1.0, max(0.1, sev + rng.uniform(-0.12, 0.12))),
+                link=rng.choice([0.0, 0.0, 0.35, 0.6, 0.75, 0.88]),
+                code=code,
+                label=label,
             )
 
     def priority(self, r: ReportRow, today: dt.date | None = None) -> int:

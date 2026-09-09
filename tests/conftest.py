@@ -17,7 +17,9 @@ os.environ.setdefault("SQS_QUEUE_URL", "")  # no AWS calls in unit or contract t
 def repo():
     from services.api.repo import InMemoryRepo
 
-    return InMemoryRepo()
+    # No demo rows in tests: assertions about ordering and paging should read against a
+    # handful of known reports, not against 140 generated ones.
+    return InMemoryRepo(demo_rows=0)
 
 
 @pytest.fixture

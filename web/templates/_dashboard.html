@@ -1,0 +1,92 @@
+{% if is_stub %}
+<div class="stub-banner">
+  <span class="dot" aria-hidden="true"></span>
+  <span><strong>Demo data.</strong> These 140 synthetic reports are seeded for a repeatable
+  demo — the layout and the queries are real, the numbers are not intake. The latency chart
+  below is the one exception: it is this process's own measured response times.</span>
+</div>
+{% endif %}
+
+<div class="stack">
+  <div class="tiles">
+    <div class="stat"><div class="k">Reports</div><div class="v">{{ total }}</div></div>
+    <div class="stat"><div class="k">Open</div><div class="v">{{ open_count }}</div></div>
+    <div class="stat"><div class="k">Critical</div>
+      <div class="v" style="color:var(--sev-critical)">{{ critical }}</div></div>
+    <div class="stat"><div class="k">Median priority</div><div class="v">{{ median }}</div></div>
+    <div class="stat"><div class="k">Unlinked to a flight</div><div class="v">{{ unlinked_pct }}<small>%</small></div></div>
+  </div>
+
+  <div class="chart-grid">
+    <section class="card">
+      <div class="card-head">
+        <h2>Reports by priority band</h2>
+        <span class="hint">Critical / High / Moderate / Low — the same bands as the worklist</span>
+      </div>
+      <div class="card-body">
+        {{ bands_svg|safe }}
+        <details class="explain" style="margin-top:var(--sp-2)">
+          <summary>View as table</summary>
+          <table class="data" style="margin-top:var(--sp-2)">
+            <thead><tr><th scope="col">Band</th><th scope="col">Reports</th></tr></thead>
+            <tbody>
+              {% for d in bands %}<tr><td>{{ d.label }}</td><td class="num">{{ d.value|int }}</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </details>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Reports by hazard category</h2>
+        <span class="hint">Top 7, remainder folded into Other</span>
+      </div>
+      <div class="card-body">
+        {{ hazards_svg|safe }}
+        <details class="explain" style="margin-top:var(--sp-2)">
+          <summary>View as table</summary>
+          <table class="data" style="margin-top:var(--sp-2)">
+            <thead><tr><th scope="col">Hazard</th><th scope="col">Reports</th></tr></thead>
+            <tbody>
+              {% for d in hazards %}<tr><td>{{ d.label }}</td><td class="num">{{ d.value|int }}</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </details>
+      </div>
+    </section>
+
+    <section class="card wide">
+      <div class="card-head">
+        <h2>Reports by month</h2>
+        <span class="hint">Trailing 12 months, by report date</span>
+      </div>
+      <div class="card-body">{{ intake_svg|safe }}</div>
+    </section>
+
+    <section class="card wide">
+      <div class="card-head">
+        <h2>Submit latency</h2>
+        <span class="hint">This process's own measurements — not a synthetic number</span>
+      </div>
+      <div class="card-body">
+        {% if latency %}
+        <p class="hero" style="margin:0 0 var(--sp-3)">
+          <span class="n" style="font-size:var(--t-h1)">{{ latency.p95_ms|round(0)|int }}<small style="font-size:var(--t-small)">ms</small></span>
+          <span class="of">p95, estimated · p50 {{ latency.p50_ms|round(0)|int }}ms · {{ latency.count|int }} requests observed</span>
+        </p>
+        {% else %}
+        <p class="muted" style="margin:0 0 var(--sp-3)">
+          No requests recorded yet in this process. Browse the worklist for a few seconds,
+          then come back — the line fills in once there is something to estimate from.
+        </p>
+        {% endif %}
+        {{ latency_svg|safe }}
+        <p class="tiny" style="margin-top:var(--sp-3)">
+          Target: 200ms at p95. {{ samples }} sample{{ "" if samples == 1 else "s" }} in
+          this chart, one per dashboard refresh, since this process started.
+        </p>
+      </div>
+    </section>
+  </div>
+</div>

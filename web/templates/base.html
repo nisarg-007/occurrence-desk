@@ -18,8 +18,9 @@
   <header class="masthead">
     <a class="wordmark" href="/console"><span class="dot" aria-hidden="true"></span>Occurrence Desk</a>
     <nav class="tabs" aria-label="Sections">
-      <a href="/console"        {% if nav == "worklist" %}aria-current="page"{% endif %}>Worklist</a>
-      <a href="/console/upload" {% if nav == "upload" %}aria-current="page"{% endif %}>Upload</a>
+      <a href="/console"           {% if nav == "worklist" %}aria-current="page"{% endif %}>Worklist</a>
+      <a href="/console/dashboard" {% if nav == "dashboard" %}aria-current="page"{% endif %}>Dashboard</a>
+      <a href="/console/upload"    {% if nav == "upload" %}aria-current="page"{% endif %}>Upload</a>
       <a href="/docs">API</a>
     </nav>
     <div class="identity">
@@ -44,6 +45,25 @@
     },
     expired() { const c = this.claims(); return !c || (c.exp && c.exp * 1000 <= Date.now()); },
   };
+
+  // Local dev only, and only when we don't already hold a live token: fetch one from
+  // /console/dev-session before htmx fires its first "load" trigger, so the very first
+  // request out of any fragment already carries a bearer token and no page ever shows
+  // a login screen on a local build. The endpoint itself 404s unless APP_ENV=local, so
+  // this is a silent no-op everywhere else. A synchronous request is the deliberate
+  // choice here — the only way to guarantee this finishes before htmx (loaded with
+  // `defer`, so it runs after this inline script but still before DOMContentLoaded)
+  // processes the page's hx-trigger="load" elements. It runs once, against one local
+  // endpoint that answers instantly, never in a deployed build.
+  (function devAutoSignIn() {
+    if (Session.token && !Session.expired()) return;
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open("GET", "/console/dev-session", false);
+      xhr.send();
+      if (xhr.status === 200) Session.token = JSON.parse(xhr.responseText).access_token;
+    } catch { /* not a local build, or the request failed — the login page still works */ }
+  })();
 
   // Every HTMX request carries the bearer token: the fragments are authenticated
   // exactly like the API they render, so this is not optional decoration.
