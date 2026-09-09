@@ -11,7 +11,8 @@ Format: `| date | what | value | command | who |`
 | Date | What | Value | Command | Who |
 |---|---|---|---|---|
 | 2026-09-08 | Contract + implementation agree (no drift) | 6/6 conformance tests pass | `pytest tests/contract/test_spec_conformance.py` | Nisarg |
-| 2026-09-08 | API test suite, M1 stub repository | 77 passed, 2 skipped (e2e — needs a live stack) | `pytest` | Nisarg |
+| 2026-09-09 | API test suite, M1 stub repository | 79 passed, 2 skipped (e2e — needs a live stack) | `pytest` | Nisarg |
+| 2026-09-09 | Clean-clone boot: runtime deps only, every page 200 | `/ /healthz /console /console/login /console/upload /console/reports/1 /docs /metrics` all 200 | `pip install -r requirements.txt && uvicorn services.api.main:app` | Nisarg |
 | 2026-09-08 | `complete` handler cost, **in-process floor** — no network, S3, SQS or database | mean 4.18 ms, p50 4.02, p95 5.10, p99 6.35, max 35.37 (n=400, 25 warmup discarded) | `python tests/bench/bench_submit.py --iterations 400` | Nisarg |
 | 2026-09-08 | Lint and format | clean | `ruff check . && ruff format --check .` | Nisarg |
 | | `POST /documents/{id}/complete` p95 with 10,000 messages queued | **target < 200 ms** — this is the number for the report; the 5.10 ms above is a floor, not a claim | Sowmya's Locust run, `services/replay/` | pending M2 |

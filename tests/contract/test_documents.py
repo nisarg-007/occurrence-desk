@@ -89,3 +89,37 @@ def test_client_supplied_request_id_is_echoed_for_tracing(client, analyst_header
         "/api/v1/reports", headers={**analyst_headers, "X-Request-Id": "01J8W2Z9QK7M3XN5RB4T6V8YHD"}
     )
     assert r.headers["X-Request-Id"] == "01J8W2Z9QK7M3XN5RB4T6V8YHD"
+
+
+def test_a_failed_enqueue_rolls_the_status_back_and_returns_503(
+    client, analyst_headers, repo, monkeypatch
+):
+    """A row saying 'queued' with no message behind it is a document stuck forever - the silent
+    loss our success criteria forbid. Found by running the API with the queue switched off."""
+
+    class DeadSqs:
+        def send_message(self, **_):
+            raise ConnectionError("elasticmq is not running")
+
+    from services.common.settings import get_settings
+
+    monkeypatch.setattr("services.common.aws.sqs", lambda: DeadSqs())
+    # get_settings is lru_cached, so the dependency and this patch see the same instance.
+    monkeypatch.setattr(get_settings(), "sqs_queue_url", "http://127.0.0.1:9/dead")
+
+    doc_id = _reserve(client, analyst_headers).json()["document_id"]
+    r = client.post(f"/api/v1/documents/{doc_id}/complete", headers=analyst_headers)
+
+    assert r.status_code == 503
+    assert r.headers["content-type"].startswith("application/problem+json")
+    assert repo.document(doc_id).status == "received", "status must roll back so a retry works"
+
+
+def test_after_a_failed_enqueue_a_retry_can_still_succeed(client, analyst_headers, repo):
+    """The rollback is only worth having if the second attempt actually enqueues."""
+    doc_id = _reserve(client, analyst_headers).json()["document_id"]
+    repo.mark_queued(doc_id)
+    repo.unmark_queued(doc_id)
+    r = client.post(f"/api/v1/documents/{doc_id}/complete", headers=analyst_headers)
+    assert r.status_code == 202
+    assert r.json()["enqueued"] is True

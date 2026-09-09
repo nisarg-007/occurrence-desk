@@ -105,6 +105,14 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
+        '503':
+          description: |
+            The queue could not be reached. The document's status is rolled back to `received`
+            so a retry can enqueue it - a row saying `queued` with no message behind it would be
+            a document stuck forever. Retryable.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /documents/{document_id}:
     get:

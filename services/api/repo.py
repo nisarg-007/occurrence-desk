@@ -70,6 +70,7 @@ class Repository(Protocol):
     def create_document(self, **kw) -> DocumentRow: ...
     def document(self, document_id: int) -> DocumentRow | None: ...
     def mark_queued(self, document_id: int) -> bool: ...
+    def unmark_queued(self, document_id: int) -> None: ...
     def reports_for_document(self, document_id: int) -> list[ReportRow]: ...
     def report(self, report_id: int) -> ReportRow | None: ...
     def list_reports(
@@ -202,6 +203,17 @@ class InMemoryRepo:
             return False
         d.status = "queued"
         return True
+
+    def unmark_queued(self, document_id: int) -> None:
+        """Put a document back to 'received' after the enqueue failed.
+
+        Without this, a failed SendMessage leaves a row saying 'queued' that no message exists
+        for - a document stuck forever, which is exactly the silent loss our success criteria
+        forbid. Rolling back means the next submit can enqueue it.
+        """
+        d = self.documents.get(document_id)
+        if d is not None and d.status == "queued":
+            d.status = "received"
 
     def reports_for_document(self, document_id: int) -> list[ReportRow]:
         return [r for r in self.reports.values() if r.document_id == document_id]

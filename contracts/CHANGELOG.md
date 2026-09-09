@@ -7,6 +7,13 @@ The format is `YYYY-MM-DD - what changed - why - signed off by`.
 
 ## Unreleased
 
+- **2026-09-09** - `POST /documents/{document_id}/complete` gains a documented **503**
+  (`Queue Unavailable`). Found by running the API with the queue switched off: the row was
+  already flipped to `queued`, the `SendMessage` failed, and the caller got a bare 500 - leaving
+  a document marked queued for a message that never existed. It now rolls the row back to
+  `received` and returns problem+json, so a retry can enqueue it. Consumers should treat 503
+  here as retryable; Sowmya's harness should count it as a failure, not a submission. - Nisarg
+
 - **2026-09-08** - No change to `openapi.yaml`. Recording two things other lanes now depend on:
   **(1)** `/metrics` publishes `occdesk_http_request_duration_seconds` (histogram; labels
   `method`, `route`, `status`; bucket edges include `0.2`) and

@@ -115,12 +115,34 @@ make e2e         # full path against the running stack
 Until the compose stack lands (Wasim, week 1), the API alone runs against an in-memory
 stub repository — enough to develop and test every route:
 
+**macOS / Linux**
+
 ```bash
-python -m venv .venv && . .venv/bin/activate
+cp .env.example .env
+python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-APP_ENV=local uvicorn services.api.main:app --reload
-# http://127.0.0.1:8000/docs   http://127.0.0.1:8000/console
+uvicorn services.api.main:app --reload
 ```
+
+**Windows (PowerShell)**
+
+```powershell
+Copy-Item .env.example .env
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn services.api.main:app --reload
+```
+
+Then open <http://127.0.0.1:8000/console/login>. Interactive API docs are at `/docs`.
+
+Run `uvicorn` **from the repository root** — the app is imported as `services.api.main`, so a
+different working directory breaks the import and the template path.
+
+`.env.example` ships with `SQS_QUEUE_URL` empty on purpose, which is what lets the API run
+alone. Set it once the compose stack is up: with a queue URL configured and nothing listening,
+`POST /documents/{id}/complete` refuses with **503** and rolls the row back to `received`,
+rather than leaving a document marked `queued` for a message that was never sent.
 
 Seeded stub logins (local only, never in prod): `analyst@occdesk.example` / `manager@occdesk.example`,
 password `occdesk-local`. Sign in at `/console/login`.

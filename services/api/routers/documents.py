@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
 
 from fastapi import APIRouter, Depends, Response, status
 
@@ -113,9 +114,26 @@ def complete(
             "trace_id": trace_id,
         }
         if s.sqs_queue_url:
-            aws.sqs().send_message(
-                QueueUrl=s.sqs_queue_url, MessageBody=json.dumps(message, separators=(",", ":"))
-            )
+            try:
+                aws.sqs().send_message(
+                    QueueUrl=s.sqs_queue_url,
+                    MessageBody=json.dumps(message, separators=(",", ":")),
+                )
+            except Exception as exc:
+                # The row already says 'queued'. If the send failed, that row is a lie: a
+                # document waiting on a message that does not exist. Roll it back so the next
+                # submit can enqueue it, and tell the caller the truth with a 503 rather than
+                # a bare 500 - a stuck document is the silent loss our criteria forbid.
+                repo.unmark_queued(doc.id)
+                logging.getLogger("api.documents").error(
+                    "enqueue failed",
+                    extra={"document_id": doc.id, "error": str(exc)},
+                )
+                raise problems.ApiProblem(
+                    503,
+                    "Queue Unavailable",
+                    "the document was accepted but could not be queued; retry shortly",
+                ) from exc
 
     # Duplicate submission is normal, not exceptional: still 202, just enqueued=false.
     response.status_code = status.HTTP_202_ACCEPTED
