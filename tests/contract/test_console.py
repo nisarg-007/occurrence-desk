@@ -160,6 +160,39 @@ def test_dev_session_mints_a_working_manager_token_locally(client):
     assert client.get("/console/fragments/stats", headers=headers).status_code == 200
 
 
+def test_stats_fragment_shows_the_real_queue_depth_not_a_hardcoded_zero(
+    client, manager_headers, monkeypatch
+):
+    """The stats tile used to pass a literal 0 into drain_eta_seconds() no matter what SQS
+    actually reported, so a manager watching the strip would never see a real backlog -
+    every poll silently said 'Waiting to parse: 0' while GET /api/v1/queue/stats (reading
+    the same queue) reported the truth. Found by tracing the fragment against the real
+    endpoint rather than trusting that a passing test suite meant the number was right -
+    no existing test asserted the fragment's queue numbers at all, only who could see them."""
+    from services.api.routers import queue as queue_router
+    from services.common.settings import get_settings
+
+    class FakeSqs:
+        def get_queue_attributes(self, QueueUrl, AttributeNames):  # noqa: N803
+            return {
+                "Attributes": {
+                    "ApproximateNumberOfMessages": "4200",
+                    "ApproximateNumberOfMessagesNotVisible": "3",
+                    "ApproximateAgeOfOldestMessage": "12",
+                }
+            }
+
+    monkeypatch.setattr("services.common.aws.sqs", lambda: FakeSqs())
+    monkeypatch.setattr(get_settings(), "sqs_queue_url", "http://fake/queue")
+    # A fresh cache, not the module singleton some earlier test in this run may have already
+    # populated with a zero snapshot within the last 5s - this test must not depend on suite
+    # ordering or wall-clock timing to see the fake SQS response.
+    monkeypatch.setattr(queue_router, "_cache", queue_router.QueueStatsCache())
+
+    body = client.get("/console/fragments/stats", headers=manager_headers).text
+    assert "4200" in body, "the real SQS backlog must reach the stats tile, not a hardcoded 0"
+
+
 def test_dev_session_is_404_outside_a_local_build(client):
     """Auth itself is not touched by this endpoint - it only exists at all when
     APP_ENV=local, so a deployed build cannot mint a session by asking nicely."""

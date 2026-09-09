@@ -16,6 +16,7 @@ Format: `| date | what | value | command | who |`
 | 2026-09-09 | Dashboard rendered in Chromium, light + dark | 0 console errors, 0 failed requests, 4 charts, auto-signed-in with no login screen (`APP_ENV=local`) | `playwright` screenshot pass | Nisarg |
 | 2026-09-09 | Demo data replaced with real NASA ASRS records | 19 real reports (5 real hazard categories), fetched from `asrs.arc.nasa.gov`, 0 invented | manual fetch + `services/api/repo.py::_REAL_ASRS_SAMPLE`, cited per-record on the report page | Nisarg |
 | 2026-09-09 | API test suite, after swapping synthetic demo rows for real ASRS records | 114 passed, 2 skipped | `pytest` | Nisarg |
+| 2026-09-09 | Bug audit of `services/api/`, `web/templates/`, and the contract; two confirmed functional bugs + three real-but-undisclosed data/honesty gaps fixed, one new regression test added | 115 passed, 2 skipped (was 114); details below | `pytest`, live re-render via `playwright` | Nisarg |
 | 2026-09-09 | Console redesign: contrast of every text/surface pair | worst pair **5.0:1** (light `--ink-3`), target 4.5:1 | `python3 /tmp/contrast.py`, values recorded in `web/static/css/console.css` | Nisarg |
 | 2026-09-09 | Console redesign: rendered in Chromium, light + dark, 4 pages | 0 console errors, 0 failed requests | `playwright` screenshot pass | Nisarg |
 | 2026-09-09 | Row link hit target | 63 × 28 px (desktop minimum 28 × 28) | `elementFromPoint` probe | Nisarg |
@@ -123,6 +124,50 @@ It is still worth recording, for one reason: it says how much of the 200 ms budg
 spends. About 5 ms of 200 means the budget is dominated by everything *around* the handler, so
 if the deployed p95 comes back at 180 ms we should look at SQS, the presign, and the ALB before
 we look at this code. That is a useful thing to know before the replay, not after it.
+
+## Bug audit, 2026-09-09
+
+Three parallel read-only passes (core API/ranking logic, the console front end, and a search for
+any remaining undisclosed fabricated data) turned up two functional bugs and three honesty gaps.
+Fixed and verified, not just reasoned about - each one below was reproduced against the actual
+running app or a real HTTP response before being called a bug, and re-checked after the fix.
+
+**`/console/fragments/stats` always showed queue backlog as 0.** `stats_fragment` in `main.py`
+passed a literal `0` into `drain_eta_seconds(0, throughput)` instead of reading the real cached
+SQS snapshot the way `GET /api/v1/queue/stats` does - the two endpoints read the same queue but
+only one of them told the truth. Invisible locally because `SQS_QUEUE_URL` is empty there too, so
+both paths happened to agree by coincidence, not because the fragment was right. Fixed by sharing
+`routers/queue.py`'s cache and fetch function. New test:
+`test_stats_fragment_shows_the_real_queue_depth_not_a_hardcoded_zero` - a fake SQS reports 4,200
+visible messages, monkeypatched via the same pattern `test_documents.py` already uses; confirmed
+this test fails against the pre-fix code (visible stayed `0`) before confirming it passes fixed.
+
+**The dashboard's "Submit latency p95" chart wasn't measuring submit.** `LATENCY.observe()` was
+called with no `route` filter, so the histogram it reads aggregated every route - `/healthz`,
+every console page, the dashboard fragment's own polling - not just
+`POST /api/v1/documents/{document_id}/complete`, the one endpoint the project's whole p95 claim is
+about. Sub-millisecond health checks mixed into the same series would make the chart look faster
+than submit actually is. Fixed by scoping the read to that one route template.
+
+**Three data-honesty gaps**, same "a wrong number is worse than no number" principle the project
+already applies to `drain_eta_seconds`, extended to three places it wasn't yet: (1) `aria-busy`
+on the worklist and dashboard was set once in static markup and never cleared, so a live region
+added for screen readers could end up permanently telling them to ignore its own updates - fixed
+with a global `htmx:beforeRequest`/`htmx:afterSwap` pair in `base.html`. (2) The worklist's 5s
+auto-poll and "Load more" pagination both target the same `<tbody>`; the poll's `innerHTML` swap
+silently discarded any extra pages loaded, invisible today at 19 seed rows but real the moment the
+corpus grows past one page - fixed with a `manuallyPaged` flag the poll now respects
+(`hx-trigger="load, every 5s [!manuallyPaged]"`), verified by counting actual network requests to
+the fragment in a live browser, not by reading the markup and assuming. (3) `/console/dev-session`'s
+own docstring claimed "the console shows a badge whenever it is in use" - no such badge existed.
+Rather than quietly editing the claim down, built the badge the comment already promised, and
+confirmed live that it appears exactly when `devAutoSignIn()` actually ran.
+
+One more, in the public contract rather than the running code: `QueueStats.workers` was documented
+as `ECS RunningTaskCount` (Sowmya's Fargate lane) but is actually derived from SQS in-flight
+message count as a floor, because that lane isn't wired yet - `routers/queue.py`'s own code
+comment already said so, `contracts/openapi.yaml`'s description didn't. Corrected to match, with a
+`contracts/CHANGELOG.md` entry per the contract-changes rule.
 
 ## Notes
 

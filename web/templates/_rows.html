@@ -26,7 +26,11 @@
 {% endfor %}
 {% if next_cursor %}
 <tr id="more"><td colspan="6" style="text-align:center">
+  <!-- Marks the page as manually paged so #worklist's own 5s poll (hx-trigger="load, every
+       5s [!manuallyPaged]") stops innerHTML-replacing the whole tbody with page 1 and
+       silently discarding every page loaded here. -->
   <button class="btn secondary" hx-get="/console/fragments/worklist?cursor={{ next_cursor }}"
-          hx-target="#more" hx-swap="outerHTML">Load more</button>
+          hx-target="#more" hx-swap="outerHTML"
+          hx-on:click="window.manuallyPaged = true">Load more</button>
 </td></tr>
 {% endif %}

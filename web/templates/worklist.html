@@ -34,7 +34,7 @@
         </thead>
         <tbody id="worklist"
                hx-get="/console/fragments/worklist"
-               hx-trigger="load, every 5s"
+               hx-trigger="load, every 5s [!manuallyPaged]"
                hx-swap="innerHTML"
                aria-live="polite" aria-busy="true">
           <tr><td colspan="6"><span class="skeleton" style="width:40%"></span></td></tr>

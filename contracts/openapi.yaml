@@ -555,7 +555,12 @@ components:
         in_flight:          { type: integer, description: ApproximateNumberOfMessagesNotVisible }
         oldest_message_age_seconds: { type: integer, nullable: true }
         dlq_depth:          { type: integer }
-        workers:            { type: integer, description: ECS RunningTaskCount }
+        workers:
+          type: integer
+          description: >-
+            Target field is ECS RunningTaskCount via CloudWatch/ContainerInsights
+            (Sowmya's lane, not wired yet). Until then this is in-flight SQS messages
+            capped at 10, or 1 when the queue is empty - a floor, not a measurement.
         throughput_per_min: { type: number, description: parsed documents, 60s rolling }
         drain_eta_seconds:  { type: integer, nullable: true }
         estimating:

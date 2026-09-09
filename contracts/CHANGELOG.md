@@ -7,6 +7,15 @@ The format is `YYYY-MM-DD - what changed - why - signed off by`.
 
 ## Unreleased
 
+- **2026-09-09** - `QueueStats.workers` description corrected, no type change. It said
+  "ECS RunningTaskCount" unqualified, which is what the field will mean once Sowmya's
+  CloudWatch/ContainerInsights plumbing lands, but the implementation right now derives it
+  from SQS in-flight message count (capped at 10, floor of 1) - a stand-in, not a
+  measurement. The description now says so, matching the code comment that was already
+  honest about it in `routers/queue.py`. Found auditing for exactly this kind of gap: a
+  wrong or misleading number is worse than no number, same principle `estimating` already
+  applies to `drain_eta_seconds`. - Nisarg
+
 - **2026-09-09** - `POST /documents/{document_id}/complete` gains a documented **503**
   (`Queue Unavailable`). Found by running the API with the queue switched off: the row was
   already flipped to `queued`, the `SendMessage` failed, and the caller got a bare 500 - leaving

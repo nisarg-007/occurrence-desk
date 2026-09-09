@@ -74,7 +74,10 @@ def bars(data: list[Datum], *, width: int = 520, unit: str = "", title: str = ""
     for i, d in enumerate(data):
         y = i * (BAR_HEIGHT + BAR_GAP)
         w = max(2, round(plot_w * (d.value / top)))
-        fill = d.color or "currentColor"
+        # Every caller today only ever passes a hardcoded var(--sev-*) string, but this is an
+        # attribute value built by string interpolation - escape it like every other piece of
+        # text in this function rather than trusting that callers will always stay that way.
+        fill = _esc(d.color) if d.color else "currentColor"
         # <title> gives a mouse-hover tooltip with the untruncated name, on top of the
         # full name already carried in the chart's own aria-label.
         rows.append(

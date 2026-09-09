@@ -24,6 +24,7 @@
       <a href="/docs">API</a>
     </nav>
     <div class="identity">
+      <span class="chip" id="dev-session-badge" hidden>dev auto-signin</span>
       <span class="who" id="whoami">Not signed in</span>
       <a href="/console/login" id="signin-link">Sign in</a>
     </div>
@@ -61,7 +62,13 @@
       const xhr = new XMLHttpRequest();
       xhr.open("GET", "/console/dev-session", false);
       xhr.send();
-      if (xhr.status === 200) Session.token = JSON.parse(xhr.responseText).access_token;
+      if (xhr.status === 200) {
+        Session.token = JSON.parse(xhr.responseText).access_token;
+        // The one client-side signal that this session was minted by dev-session rather
+        // than a real sign-in — the token itself looks identical either way. Read by
+        // identity() below so the header says so on screen, not just in a code comment.
+        window.__devAutoSession = true;
+      }
     } catch { /* not a local build, or the request failed — the login page still works */ }
   })();
 
@@ -101,14 +108,27 @@
     const c = Session.claims();
     const who = document.getElementById("whoami");
     const link = document.getElementById("signin-link");
+    const badge = document.getElementById("dev-session-badge");
     if (c && !Session.expired()) {
       who.textContent = c.email;
       who.title = c.email + " · " + c.role;
       link.textContent = "Sign out";
       link.href = "#";
       link.onclick = (ev) => { ev.preventDefault(); Session.token = null; location.href = "/console/login"; };
+      badge.hidden = !window.__devAutoSession;
     }
   })();
+
+  // A live region stuck at aria-busy="true" forever tells assistive tech to disregard
+  // every update the aria-live was added for. Set it true right when a poll's request
+  // goes out, clear it the moment the swap that follows finishes — one place, so no
+  // fragment has to remember to do this itself.
+  document.body.addEventListener("htmx:beforeRequest", (e) => {
+    e.detail.target?.setAttribute?.("aria-busy", "true");
+  });
+  document.body.addEventListener("htmx:afterSwap", (e) => {
+    e.detail.target?.removeAttribute?.("aria-busy");
+  });
   </script>
   {% block scripts %}{% endblock %}
 </body>

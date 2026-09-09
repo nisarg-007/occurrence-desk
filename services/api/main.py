@@ -255,6 +255,7 @@ def stats_fragment(
     request: Request,
     p: Principal = Depends(analyst),
     repo=Depends(get_repo),
+    s: Settings = Depends(settings_dep),
 ):
     """What an analyst actually wants at the top of the screen.
 
@@ -264,14 +265,26 @@ def stats_fragment(
     """
     rows = repo.list_reports(cursor=None, page_size=1000)
     priorities = sorted((repo.priority(r) for r in rows), reverse=True)
-    queue = None
+    queue_info = None
     if p.has("manager"):
         from services.api.queue_stats import MIN_MEANINGFUL_THROUGHPUT_PER_MIN, drain_eta_seconds
+        from services.common import aws
+
+        # Same cached snapshot GET /api/v1/queue/stats reads - this tile must not silently
+        # show 0 while the real endpoint reports a real backlog. Sharing queue.router's
+        # module-level cache means both places agree, and neither hammers SQS on its own.
+        def fetch():
+            if not s.sqs_queue_url:
+                return queue.Snapshot(0, 0, None, 0, 0.0)
+            return queue.fetch_from_sqs(aws.sqs(), s.sqs_queue_url, s.sqs_dlq_url)
+
+        queue._cache.ttl = s.queue_stats_cache_seconds
+        snap = queue._cache.get(fetch)
 
         throughput = float(repo.parsed_in_last_60s())
-        eta = drain_eta_seconds(0, throughput)
-        queue = {
-            "visible": 0,
+        eta = drain_eta_seconds(snap.visible, throughput)
+        queue_info = {
+            "visible": snap.visible,
             "estimating": throughput < MIN_MEANINGFUL_THROUGHPUT_PER_MIN,
             "eta_minutes": round((eta or 0) / 60),
         }
@@ -282,7 +295,7 @@ def stats_fragment(
             "open_count": sum(1 for r in rows if r.state in ("new", "triaged")),
             "high_count": sum(1 for v in priorities if v >= 70),
             "top_priority": priorities[0] if priorities else None,
-            "queue": queue,
+            "queue": queue_info,
         },
     )
 
@@ -350,8 +363,12 @@ def dashboard_fragment(
             )
         )
 
-    # --- our own submit latency, read back out of the Prometheus histogram
-    LATENCY.observe()
+    # --- our own submit latency, read back out of the Prometheus histogram - filtered to the
+    # one route the project's p95 claim is actually about. Without the route filter this
+    # would average in every /healthz, /console and fragment request the dashboard's own
+    # polling generates, which are sub-millisecond and would make the chart look faster than
+    # submit actually is - exactly the kind of number this project doesn't want to show.
+    LATENCY.observe(route=f"{API_PREFIX}/documents/{{document_id}}/complete")
     sample = LATENCY.latest
 
     return TEMPLATES.TemplateResponse(
