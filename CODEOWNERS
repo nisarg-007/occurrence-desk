@@ -1,5 +1,4 @@
 # One owner per directory. A PR touching someone else's directory needs their review.
-# GitHub usernames to be filled in during week 1 [verify].
 
 /contracts/            @nisarg-007
 /services/api/         @nisarg-007
@@ -8,14 +7,14 @@
 /tests/e2e/            @nisarg-007
 /docs/                 @nisarg-007
 
-/db/                   # Parva
-/services/worker/      # Smit
-/eval/                 # Smit
-/infra/                # Wasim
-/.github/              # Wasim
-/docker-compose.yml    # Wasim
-/Makefile              # Wasim
-/ops/                  # Sowmya
-/services/replay/      # Sowmya
+/db/                   @pshah2983
+/services/worker/      @smit2102
+/eval/                 @smit2102
+/infra/                @wasimakrammind
+/.github/              @wasimakrammind
+/docker-compose.yml    @wasimakrammind
+/Makefile              @wasimakrammind
+/ops/                  @SowmyaGooty
+/services/replay/      @SowmyaGooty
 
 /services/common/      @nisarg-007

@@ -115,10 +115,10 @@ def _rec(
 #: Severity anchors one per hazard category, chosen to match the category's real-world
 #: gravity (a near-midair collision outweighs an ATC staffing complaint); only categories
 #: we actually fetched real examples for are represented - no invented category filled a gap.
-#: First four are the ranking-order-sensitive fixture used when demo_rows=0 (tests); the
-#: rest only appear in a live run. `best_link_confidence` is left unset throughout - no BTS
-#: join has been run against any of these, and a fabricated confidence would be exactly the
-#: kind of invented number this dataset exists to avoid.
+#: First four are the ranking-order-sensitive fixture used when full_sample=False (tests);
+#: the rest only appear in a live run. `best_link_confidence` is left unset throughout - no
+#: BTS join has been run against any of these, and a fabricated confidence would be exactly
+#: the kind of invented number this dataset exists to avoid.
 _REAL_ASRS_SAMPLE: tuple[dict, ...] = (
     _rec(
         "2068539",
@@ -492,7 +492,7 @@ class InMemoryRepo:
     #: shows this on screen: numbers on a dashboard must never be mistaken for real results.
     is_stub = True
 
-    def __init__(self, seed: bool = True, demo_rows: int = 140) -> None:
+    def __init__(self, seed: bool = True, full_sample: bool = True) -> None:
         self.users: dict[str, UserRow] = {}
         self.documents: dict[int, DocumentRow] = {}
         self.reports: dict[int, ReportRow] = {}
@@ -502,7 +502,7 @@ class InMemoryRepo:
             t: itertools.count(1) for t in ("users", "documents", "reports", "dispositions")
         }
         self._parsed_at: list[dt.datetime] = []
-        self.demo_rows = demo_rows
+        self.full_sample = full_sample
         if seed:
             self._seed()
 
@@ -536,10 +536,10 @@ class InMemoryRepo:
             status="parsed",
             page_count=112,
         )
-        # demo_rows=0 (tests) gets the first four - one per hazard category, chosen so the
-        # ranking spread is visible - rather than the whole batch, so the fixture stays small
-        # and fast. A real deployment gets all of them.
-        records = _REAL_ASRS_SAMPLE if self.demo_rows else _REAL_ASRS_SAMPLE[:4]
+        # full_sample=False (tests) gets the first four - one per hazard category, chosen so
+        # the ranking spread is visible - rather than the whole batch, so the fixture stays
+        # small and fast. A real deployment gets all of them.
+        records = _REAL_ASRS_SAMPLE if self.full_sample else _REAL_ASRS_SAMPLE[:4]
         for rec in records:
             self._add_report(doc_id, **rec)
 
