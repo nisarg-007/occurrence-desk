@@ -327,17 +327,26 @@ def dashboard_fragment(
     if other:
         hazards.append(charts.Datum("Other", other))
 
-    # --- intake by month over the last 12 months
+    # --- intake by month, the trailing 12 months anchored on the corpus's own latest
+    # report date, not wall-clock today. For a live system the two are close to the same
+    # thing - the newest report is usually recent. For this seed, which is real, dated
+    # ASRS records rather than continuously arriving intake, anchoring on today would push
+    # every one of them outside the window and draw twelve empty columns; anchoring on the
+    # data says "the last twelve months this corpus actually has," which is what the chart
+    # claims to show.
+    latest = max((r.report_date for r in rows if r.report_date), default=today)
     months, counts = [], []
     for back in range(11, -1, -1):
-        anchor = (today.replace(day=1) - dt.timedelta(days=back * 30)).replace(day=1)
-        months.append(anchor.strftime("%b"))
+        y, m = latest.year, latest.month - back
+        while m <= 0:
+            m += 12
+            y -= 1
+        months.append(dt.date(y, m, 1).strftime("%b"))
         counts.append(
             sum(
                 1
                 for r in rows
-                if r.report_date
-                and (r.report_date.year, r.report_date.month) == (anchor.year, anchor.month)
+                if r.report_date and (r.report_date.year, r.report_date.month) == (y, m)
             )
         )
 

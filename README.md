@@ -161,9 +161,17 @@ On a local build (`APP_ENV=local`) the console signs itself in automatically aga
 dedicated `/console/dev-session` endpoint, so there is no login screen to click through
 while developing. Auth itself is untouched — every fragment still requires the same bearer
 token and the same `require_role` checks, `/console/dev-session` just mints one instead of
-asking for a password, and it 404s the moment `APP_ENV` is anything else. The dashboard also
-says on screen when it's drawing the seeded demo dataset rather than real intake, so a chart
-that looks finished is never mistaken for one that means something yet.
+asking for a password, and it 404s the moment `APP_ENV` is anything else.
+
+The seed data is 19 real NASA ASRS incident records — real ACNs, synopses and narrative
+excerpts, fetched from [asrs.arc.nasa.gov](https://asrs.arc.nasa.gov/search/reportsets.html),
+not invented. Each report's "Coded fields" card links to the exact PDF it came from. What
+isn't real yet is on-screen too: none of these are linked to a BTS flight (Parva's join)
+or run through Smit's byte-exact parser (this is a small, hand-fetched sample, not the full
+1,500-record corpus) — the dashboard's banner and the report page both say so, so a chart
+that looks finished is never mistaken for one that means more than it does. See
+`docs/measurements.md` for exactly what that implies for the ranking (nothing in this
+sample reaches "critical," and that's the formula, not a bug).
 
 Priority is never communicated by colour alone: every score carries a band name in text
 (Critical / High / Moderate / Low) and a four-step meter, so the ranking survives colour

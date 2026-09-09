@@ -1,9 +1,14 @@
 {% if is_stub %}
 <div class="stub-banner">
   <span class="dot" aria-hidden="true"></span>
-  <span><strong>Demo data.</strong> These 140 synthetic reports are seeded for a repeatable
-  demo — the layout and the queries are real, the numbers are not intake. The latency chart
-  below is the one exception: it is this process's own measured response times.</span>
+  <span><strong>Real ASRS reports, small sample.</strong> These {{ total }} reports are
+  real NASA incident records — real ACNs, synopses and narrative excerpts, fetched from
+  <a href="https://asrs.arc.nasa.gov/search/reportsets.html">asrs.arc.nasa.gov</a> this
+  session, not invented. What isn't real yet: they aren't linked to a BTS flight (Parva's
+  join), they weren't run through Smit's byte-exact parser, and this is a hand-picked
+  sample, not the full 1,500-record corpus. Open a report's "Source" section for the exact
+  URL each one came from. The latency chart below is unrelated to this: it's this process's
+  own measured response times, not sourced data.</span>
 </div>
 {% endif %}
 

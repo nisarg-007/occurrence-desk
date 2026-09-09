@@ -52,8 +52,10 @@ def test_a_page_shell_leaks_no_report_data(client):
 
 
 def test_worklist_fragment_shows_the_highest_priority_first(client, analyst_headers):
+    """ACN 2068539 (a real NASA NMAC report, severity 0.95) outranks ACN 2105330 (a real ATC
+    staffing complaint, severity 0.50) - computed from the ranking formula, not hand-set."""
     body = client.get("/console/fragments/worklist", headers=analyst_headers).text
-    assert body.index("2068539") < body.index("2059977")
+    assert body.index("2068539") < body.index("2105330")
 
 
 def test_report_fragment_shows_the_four_terms_and_the_score(client, analyst_headers):
@@ -68,10 +70,16 @@ def test_report_fragment_shows_the_four_terms_and_the_score(client, analyst_head
 
 def test_severity_is_never_communicated_by_colour_alone(client, analyst_headers):
     """A band name in text plus a four-step meter, so the ranking survives colour
-    blindness, a greyscale printout, and a screen reader."""
+    blindness, a greyscale printout, and a screen reader.
+
+    The band checked here is "high", not "critical": with real, honestly-unlinked ASRS
+    reports (no fabricated link confidence) and real report ages, nothing in the small
+    fixture clears the 70-point critical floor - see docs/measurements.md. That is the
+    formula behaving correctly on real numbers, not a gap in the fixture.
+    """
     body = client.get("/console/fragments/worklist", headers=analyst_headers).text
-    assert 'data-level="critical"' in body
-    assert "Critical" in body
+    assert 'data-level="high"' in body
+    assert "High" in body
     assert '<span class="meter"' in body
 
 
@@ -117,9 +125,11 @@ def test_console_pages_are_not_in_the_public_api_document(client):
 
 def test_dashboard_fragment_shows_the_stub_banner(client, analyst_headers):
     """The test client always runs against InMemoryRepo, so is_stub is always true here -
-    the banner must say so in words, not just imply it with a colour."""
+    the banner must say so in words, not just imply it with a colour. It also has to say
+    the data is real, not synthetic - that's the whole point of the banner now."""
     body = client.get("/console/fragments/dashboard", headers=analyst_headers).text
-    assert "Demo data" in body
+    assert "Real ASRS reports" in body
+    assert "asrs.arc.nasa.gov" in body
 
 
 def test_dashboard_fragment_charts_are_never_colour_alone(client, analyst_headers):

@@ -14,6 +14,8 @@ Format: `| date | what | value | command | who |`
 | 2026-09-09 | API test suite, M1 stub repository | 85 passed, 2 skipped (e2e — needs a live stack) | `pytest` | Nisarg |
 | 2026-09-09 | API test suite, after the console dashboard (charts + latency reader + fragment) | 114 passed, 2 skipped | `pytest` | Nisarg |
 | 2026-09-09 | Dashboard rendered in Chromium, light + dark | 0 console errors, 0 failed requests, 4 charts, auto-signed-in with no login screen (`APP_ENV=local`) | `playwright` screenshot pass | Nisarg |
+| 2026-09-09 | Demo data replaced with real NASA ASRS records | 19 real reports (5 real hazard categories), fetched from `asrs.arc.nasa.gov`, 0 invented | manual fetch + `services/api/repo.py::_REAL_ASRS_SAMPLE`, cited per-record on the report page | Nisarg |
+| 2026-09-09 | API test suite, after swapping synthetic demo rows for real ASRS records | 114 passed, 2 skipped | `pytest` | Nisarg |
 | 2026-09-09 | Console redesign: contrast of every text/surface pair | worst pair **5.0:1** (light `--ink-3`), target 4.5:1 | `python3 /tmp/contrast.py`, values recorded in `web/static/css/console.css` | Nisarg |
 | 2026-09-09 | Console redesign: rendered in Chromium, light + dark, 4 pages | 0 console errors, 0 failed requests | `playwright` screenshot pass | Nisarg |
 | 2026-09-09 | Row link hit target | 63 × 28 px (desktop minimum 28 × 28) | `elementFromPoint` probe | Nisarg |
@@ -84,6 +86,30 @@ noticing — `test_charts.py` checks that a `<rect>` exists at all, not whether 
 `<text>` next to it. Fixed by widening the label column, truncating with an ellipsis past 20
 characters (full name kept in `aria-label` and a `<title>` tooltip), and widening the value gap
 to clear a three-digit number.
+
+## Where the dashboard's data actually comes from
+
+The console originally seeded 140 synthetic reports (`random.Random(42)`) so the dashboard had
+something to draw before Smit's parser exists. That's honest as far as it goes - the banner said
+"demo data" - but it's not what the proposal promises ("we invented no data"), so it's been
+replaced with 19 real NASA ASRS incident records, fetched this session from the actual report-set
+PDFs at `asrs.arc.nasa.gov` (Near Midair Collision, Altitude Deviations, Runway Incursions,
+Inflight Weather Encounters, Air Traffic Controller Reports). Every ACN, synopsis, and narrative
+excerpt in `services/api/repo.py::_REAL_ASRS_SAMPLE` traces to a real source - each report's
+"Coded fields" card on `/console/reports/{id}` links straight to the PDF it came from.
+
+What this is not: it's not Smit's parser (that's a deterministic `pdfplumber` column parse over
+all 1,500 records; this is 19 hand-picked ones, fetched and transcribed this session, narrative
+truncated to an excerpt), and it's not linked to a real flight (that's Parva's BTS join - every
+`best_link_confidence` here is unset, not a fabricated number). The banner and the report page say
+both things explicitly rather than letting the real data imply more than it is.
+
+One real consequence worth recording: with link confidence honestly at zero and report dates that
+are genuinely ~2.5 years old by the time anyone is running this demo, no report in this sample
+reaches the "critical" band (70+) - the max reachable is roughly severity-only, about 45 points,
+which lands in "high". That's the ranking formula behaving correctly on real numbers, not a gap in
+the sample; `test_severity_is_never_communicated_by_colour_alone` was rewritten to check the band
+that's actually reachable instead of asserting one that isn't.
 
 ## Reading the floor number honestly
 
