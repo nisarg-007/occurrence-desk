@@ -1,0 +1,36 @@
+{
+  "kept": [
+    "ATC Issue",
+    "Aircraft Equipment Problem",
+    "Airspace Violation",
+    "Conflict",
+    "Deviation - Altitude",
+    "Deviation - Speed",
+    "Deviation - Track / Heading",
+    "Deviation / Discrepancy - Procedural",
+    "Flight Deck / Cabin / Aircraft Event",
+    "Ground Event / Encounter",
+    "Ground Incursion",
+    "Inflight Event / Encounter"
+  ],
+  "dropped_into_other": [
+    "Ground Excursion",
+    "No Specific Anomaly Occurred"
+  ],
+  "counts": {
+    "Inflight Event / Encounter": 605,
+    "Deviation / Discrepancy - Procedural": 1095,
+    "Aircraft Equipment Problem": 529,
+    "Flight Deck / Cabin / Aircraft Event": 236,
+    "Deviation - Track / Heading": 107,
+    "Deviation - Altitude": 235,
+    "Ground Event / Encounter": 163,
+    "ATC Issue": 283,
+    "Deviation - Speed": 53,
+    "Ground Incursion": 92,
+    "Conflict": 388,
+    "No Specific Anomaly Occurred": 20,
+    "Ground Excursion": 27,
+    "Airspace Violation": 115
+  }
+}

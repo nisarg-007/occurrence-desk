@@ -38,10 +38,12 @@ Format: `| date | what | value | command | who |`
 
 | Date | What | Value | Command | Who |
 |---|---|---|---|---|
-| | Records extracted from 30 report sets | **target 1,500**, or a written explanation of every shortfall | `python eval/score.py` | pending |
-| | Field extraction P / R / F1 vs 50 gold records | | `python eval/score.py` | pending |
-| | Categorisation micro-F1 / macro-F1, set-level split | report honestly whatever it comes out at | `python eval/score.py` | pending |
-| | Mean and p99 parse time per document | **hand this number to Sowmya** — her visibility timeout and autoscaling target both derive from it | worker structured logs, `duration_ms` | pending |
+| 2026-09-09 | Records extracted from 30 report sets | **1,500 / 1,500** — all 30 sets, 0 schema failures, 0 crashes | `python services/worker/classifier.py` (prints total while loading) | Smit |
+| 2026-09-09 | Field extraction P / R / F1 vs gold records | **P 1.000 R 1.000 F1 1.000** (n=32 records, 1,546 field pairs) — **32 of the 50 the work-pack specifies; not yet complete**, see note below | `python eval/score.py` | Smit |
+| 2026-09-09 | Categorisation micro-F1 / macro-F1, set-level split (6 sets held out entirely) | **micro-F1 0.783, macro-F1 0.574** (n=300 held-out records) — per-label table + error analysis in `eval/report.md` | `python services/worker/classifier.py` | Smit |
+| 2026-09-09 | Mean and p99 parse time per document (one PDF, ~50 records) | mean **3752 ms**, p50 3534, p95 5248, **p99 6010 ms**, max 6010 (n=30 documents; ≈75 ms/record) — **hand-off to Sowmya**: her SQS `visibility_timeout` must sit comfortably above 6.0 s, and her autoscaling target is `acceptable_latency_s / 3.75` | `python tests/bench/bench_parse.py` | Smit |
+
+**Open item, flagged not hidden:** the extraction accuracy score above is real, but the sample is 32 hand-verified records (one per report set for 24 of the 30 sets, plus extra coverage on structural edge cases), not the full 50 the work-pack calls for ("budget a full day"). Two real bugs were found and fixed via this process before it hit 1.000 (see `services/worker/parser.py` history: bare `Person` and bare `Aircraft` sections were briefly merging into the wrong neighbouring section). `ga_train.pdf` and `helo.pdf` share one identical ACN (2056353) in NASA's own data — only counted once, under `ga_train.pdf`. Expanding to a full, ideally team-reviewed, 50-record set is still open.
 
 ## Queue, scaling and load (Sowmya)
 
