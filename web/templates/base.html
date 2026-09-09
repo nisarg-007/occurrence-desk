@@ -4,58 +4,34 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Occurrence Desk{% endblock %}</title>
-  <script src="https://unpkg.com/htmx.org@2.0.4"
-          integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvWD79OC/LTtG6dMp+"
-          crossorigin="anonymous"></script>
-  <style>
-    :root {
-      --bg: #0f1115; --panel: #171a21; --line: #262b36; --text: #e6e9ef;
-      --muted: #93a0b5; --accent: #4c8dff; --hot: #ff5f56; --warm: #ffbd2e; --cool: #27c93f;
-    }
-    @media (prefers-color-scheme: light) {
-      :root { --bg:#f7f8fa; --panel:#fff; --line:#e3e6ec; --text:#12151b; --muted:#5c6779; }
-    }
-    * { box-sizing: border-box; }
-    body { margin:0; background:var(--bg); color:var(--text);
-           font:15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
-    header { display:flex; align-items:baseline; gap:1.5rem; padding:1rem 1.5rem;
-             border-bottom:1px solid var(--line); }
-    header h1 { font-size:1rem; margin:0; letter-spacing:.02em; }
-    header nav a { color:var(--muted); text-decoration:none; margin-right:1rem; }
-    header nav a:hover { color:var(--text); }
-    main { padding:1.5rem; max-width:1100px; }
-    table { width:100%; border-collapse:collapse; }
-    th { text-align:left; font-size:.75rem; text-transform:uppercase; letter-spacing:.06em;
-         color:var(--muted); padding:.5rem .75rem; border-bottom:1px solid var(--line); }
-    td { padding:.6rem .75rem; border-bottom:1px solid var(--line); vertical-align:top; }
-    tr:hover td { background:var(--panel); }
-    .pri { font-variant-numeric:tabular-nums; font-weight:600; }
-    .pri-hi { color:var(--hot); } .pri-mid { color:var(--warm); } .pri-lo { color:var(--muted); }
-    .chip { display:inline-block; padding:.1rem .5rem; border-radius:999px; font-size:.75rem;
-            border:1px solid var(--line); color:var(--muted); }
-    .muted { color:var(--muted); }
-    .card { background:var(--panel); border:1px solid var(--line); border-radius:10px;
-            padding:1rem 1.25rem; margin-bottom:1rem; }
-    button, .btn { background:var(--accent); color:#fff; border:0; border-radius:6px;
-                   padding:.5rem .9rem; font:inherit; cursor:pointer; }
-    code { background:var(--panel); padding:.1rem .35rem; border-radius:4px; }
-  </style>
+  <link rel="stylesheet" href="/static/css/console.css">
+  <!-- inline so there is no favicon 404 on every page load (it shows up in /metrics too) -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232E6FE0'/%3E%3Crect x='8' y='17' width='4' height='7' rx='1.5' fill='white'/%3E%3Crect x='14' y='12' width='4' height='12' rx='1.5' fill='white'/%3E%3Crect x='20' y='7' width='4' height='17' rx='1.5' fill='white'/%3E%3C/svg%3E">
+  <!-- htmx is vendored, not fetched from a CDN: the demo has to work with the
+       wifi off, and an unreachable script would leave the worklist saying
+       "loading" forever. -->
+  <script src="/static/vendor/htmx-2.0.4.min.js" defer></script>
 </head>
 <body>
-  <header>
-    <h1>Occurrence Desk</h1>
-    <nav>
-      <a href="/console">Worklist</a>
-      <a href="/console/upload">Upload</a>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="masthead">
+    <a class="wordmark" href="/console"><span class="dot" aria-hidden="true"></span>Occurrence Desk</a>
+    <nav class="tabs" aria-label="Sections">
+      <a href="/console"        {% if nav == "worklist" %}aria-current="page"{% endif %}>Worklist</a>
+      <a href="/console/upload" {% if nav == "upload" %}aria-current="page"{% endif %}>Upload</a>
       <a href="/docs">API</a>
     </nav>
-    <span class="muted" style="margin-left:auto" id="whoami">not signed in</span>
-    <a href="/console/login" class="muted" id="signin-link">sign in</a>
+    <div class="identity">
+      <span class="who" id="whoami">Not signed in</span>
+      <a href="/console/login" id="signin-link">Sign in</a>
+    </div>
   </header>
-  <main>{% block content %}{% endblock %}</main>
+
+  <main id="main" tabindex="-1">{% block content %}{% endblock %}</main>
 
   <script>
-  // One place decides how the console holds a token, so no page invents its own scheme.
+  // One place decides how the console holds a token, so no page invents its own.
   const Session = {
     key: "occdesk_token",
     get token() { try { return localStorage.getItem(this.key); } catch { return null; } },
@@ -66,38 +42,54 @@
       try { return JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))); }
       catch { return null; }
     },
-    expired() {
-      const c = this.claims();
-      return !c || (c.exp && c.exp * 1000 <= Date.now());
-    },
+    expired() { const c = this.claims(); return !c || (c.exp && c.exp * 1000 <= Date.now()); },
   };
 
-  // Every HTMX request carries the bearer token. The fragments are authenticated exactly like
-  // the API they render, so this is not optional decoration.
+  // Every HTMX request carries the bearer token: the fragments are authenticated
+  // exactly like the API they render, so this is not optional decoration.
   document.body.addEventListener("htmx:configRequest", (e) => {
     if (Session.token) e.detail.headers["Authorization"] = `Bearer ${Session.token}`;
   });
 
-  // A 401 on a fragment means the token aged out mid-shift. Say so and send them to sign in,
-  // rather than leaving an empty table that looks like "no reports".
+  // A token that ages out mid-shift must not look like "no reports".
   document.body.addEventListener("htmx:responseError", (e) => {
+    const target = e.detail.target;
     if (e.detail.xhr.status === 401) {
       Session.token = null;
       location.href = "/console/login?next=" + encodeURIComponent(location.pathname);
+      return;
+    }
+    if (target) {
+      target.innerHTML =
+        '<div class="state-block"><h3>Couldn’t load this</h3>' +
+        '<p>The server answered ' + e.detail.xhr.status + '. It will retry on the next refresh.</p>' +
+        '<button class="btn secondary" onclick="location.reload()">Reload</button></div>';
     }
   });
 
-  (function renderIdentity() {
+  // Pointer users get the whole row; keyboard users get the anchor inside it. Text
+  // selection and modifier-clicks are left alone.
+  document.addEventListener("click", (e) => {
+    const row = e.target.closest?.("tr[data-href]");
+    if (!row || e.target.closest("a, button")) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+    if (window.getSelection()?.toString()) return;
+    location.href = row.dataset.href;
+  });
+
+  (function identity() {
     const c = Session.claims();
     const who = document.getElementById("whoami");
     const link = document.getElementById("signin-link");
     if (c && !Session.expired()) {
-      who.textContent = `${c.email} · ${c.role}`;
-      link.textContent = "sign out";
+      who.textContent = c.email;
+      who.title = c.email + " · " + c.role;
+      link.textContent = "Sign out";
       link.href = "#";
-      link.onclick = (ev) => { ev.preventDefault(); Session.token = null; location.reload(); };
+      link.onclick = (ev) => { ev.preventDefault(); Session.token = null; location.href = "/console/login"; };
     }
   })();
   </script>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

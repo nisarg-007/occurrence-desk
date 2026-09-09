@@ -1,0 +1,22 @@
+<div class="stat">
+  <div class="k">Open reports</div>
+  <div class="v">{{ open_count }}</div>
+</div>
+<div class="stat">
+  <div class="k">Needs attention</div>
+  <div class="v">{{ high_count }} <small>priority 70+</small></div>
+</div>
+<div class="stat">
+  <div class="k">Highest priority</div>
+  <div class="v">{{ top_priority if top_priority is not none else "—" }}</div>
+</div>
+{% if queue %}
+<div class="stat">
+  <div class="k">Waiting to parse</div>
+  <div class="v">{{ queue.visible }}</div>
+</div>
+<div class="stat">
+  <div class="k">Backlog drains in</div>
+  <div class="v">{% if queue.estimating %}<small>Estimating…</small>{% else %}{{ queue.eta_minutes }} <small>min</small>{% endif %}</div>
+</div>
+{% endif %}

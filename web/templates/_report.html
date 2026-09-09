@@ -1,89 +1,134 @@
-<div class="card">
-  <div style="display:flex;align-items:baseline;gap:1rem">
-    <span class="pri {% if why.priority >= 70 %}pri-hi{% elif why.priority >= 40 %}pri-mid{% else %}pri-lo{% endif %}"
-          style="font-size:2rem">{{ why.priority }}</span>
-    <div>
-      <strong>ACN {{ r.acn }}</strong>
-      <span class="muted">{{ r.report_date or "undated" }} &middot; {{ r.state }}</span><br>
-      <span class="muted">{{ r.synopsis or "no synopsis" }}</span>
-    </div>
+<div class="page-head">
+  <div>
+    <h1>ACN {{ r.acn }}</h1>
+    <p>{{ r.synopsis or "No synopsis in the source record" }}</p>
+  </div>
+  <div style="margin-left:auto">
+    <span class="sev" data-level="{{ level }}">
+      <span class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span class="label">{{ level_label }}</span>
+    </span>
   </div>
 </div>
 
-<div class="card">
-  <strong>Why is this here?</strong>
-  <span class="muted"><code>{{ why.formula }}</code></span>
-  <table style="margin-top:.75rem">
-    <thead><tr><th>Term</th><th style="width:5rem">Weight</th><th style="width:6rem">Value</th>
-      <th style="width:6rem">Product</th><th>Meaning</th></tr></thead>
-    <tbody>
-      {% for t in why.terms %}
-      <tr>
-        <td><code>{{ t.name }}</code></td>
-        <td class="pri">{{ "%.2f"|format(t.weight) }}</td>
-        <td class="pri">{{ "%.3f"|format(t.value) }}</td>
-        <td class="pri">{{ "%.3f"|format(t.product) }}</td>
-        <td class="muted">{{ t.explanation }}</td>
-      </tr>
-      {% endfor %}
-      <tr>
-        <td colspan="3" class="muted">sum &times; 100</td>
-        <td class="pri">{{ why.priority }}</td>
-        <td class="muted">the number on the worklist row</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+<div class="stack">
+  <section class="card">
+    <div class="card-head">
+      <h2>Why it ranks here</h2>
+      <span class="hint">Recomputed on every read — nothing is cached or hand-set</span>
+    </div>
+    <div class="card-body">
+      <p class="hero" style="margin:0 0 var(--sp-4)">
+        <span class="n" style="color:var(--sev-{{ level }})">{{ why.priority }}</span>
+        <span class="of">out of 100 · {{ level_label|lower }}</span>
+      </p>
 
-<div class="card">
-  <strong>Hazards</strong>
-  <p>
-    {% for h in r.hazards %}
-      <span class="chip">{{ h.label }} &middot; {{ h.source }} {{ "%.2f"|format(h.confidence) }}</span>
-    {% else %}<span class="muted">none assigned</span>{% endfor %}
-  </p>
-  <span class="muted">
-    <code>nasa</code> rows are NASA analysts' own codes — the ground truth our accuracy number is
-    measured against. <code>model</code> rows are our prediction.
-  </span>
-</div>
-
-<div class="card">
-  <strong>Linked flight</strong>
-  {% if r.linked_flight %}
-    <p>{{ r.linked_flight.carrier }} · {{ r.linked_flight.flight_date }} ·
-       {{ r.linked_flight.origin }} → {{ r.linked_flight.dest }}
-       <span class="chip">confidence {{ "%.2f"|format(r.linked_flight.confidence) }}</span>
-       <span class="chip">{{ r.linked_flight.method }}</span></p>
-  {% else %}
-    <p class="muted">
-      No confident match. ASRS records are de-identified on purpose, so a link is probabilistic
-      and sometimes there is not one — saying so is the honest output, not a failure.
-    </p>
-  {% endif %}
-</div>
-
-<div class="card">
-  <strong>Narrative</strong>
-  <p style="white-space:pre-wrap">{{ r.narrative }}</p>
-</div>
-
-{% if r.coded %}
-<div class="card">
-  <strong>Coded fields</strong>
-  <span class="muted">NASA's dotted paths, verbatim — not snake-cased, so this page can be
-  checked line by line against the printed PDF.</span>
-  <table style="margin-top:.75rem">
-    {% for section, fields in r.coded.items() %}
-      {% if fields is mapping %}
-        {% for path, value in fields.items() %}
-        <tr><td class="muted" style="width:22rem"><code>{{ section }}.{{ path }}</code></td>
-            <td>{{ value }}</td></tr>
+      <!-- One shared 0-100 axis. Each row's track is the most that term can contribute
+           (its weight), the fill is what it actually contributed, so the four track
+           widths show the weighting at a glance. The exact figures are printed beside
+           each bar, so the bar is never the only encoding. -->
+      <div class="why">
+        {% for t in why.terms %}
+        <div class="term">
+          <span class="name">{{ t.name|replace("_", " ")|capitalize }}</span>
+          <span class="rail">
+            <span class="cap"  style="width: {{ (t.weight * 100)|round(1) }}%"></span>
+            <span class="fill" style="width: {{ (t.product * 100)|round(1) }}%"></span>
+          </span>
+          <span class="val"><b>{{ (t.product * 100)|round(1) }}</b> / {{ (t.weight * 100)|round|int }}</span>
+        </div>
         {% endfor %}
-      {% else %}
-        <tr><td class="muted"><code>{{ section }}</code></td><td>{{ fields }}</td></tr>
+        <div class="axis"><span>0</span><span>50</span><span>100 points</span></div>
+      </div>
+
+      <details class="explain" style="margin-top:var(--sp-3)">
+        <summary>What each term means</summary>
+        <dl class="fields" style="grid-template-columns:10rem 1fr;margin-top:var(--sp-2)">
+          {% for t in why.terms %}
+          <dt style="font-family:var(--sans);font-size:var(--t-small);color:var(--ink);font-weight:550">{{ t.name|replace("_", " ")|capitalize }}</dt>
+          <dd class="muted" style="font-size:var(--t-small)">{{ t.explanation }}</dd>
+          {% endfor %}
+        </dl>
+      </details>
+    </div>
+  </section>
+
+  <div class="detail-grid">
+    <div class="stack">
+      <section class="card">
+        <div class="card-head"><h2>Narrative</h2>
+          <span class="hint">As filed by the reporter</span></div>
+        <div class="card-body"><div class="narrative">{{ r.narrative }}</div></div>
+      </section>
+
+      {% if r.coded %}
+      <section class="card">
+        <div class="card-head"><h2>Coded fields</h2>
+          <span class="hint">NASA's field names, verbatim</span></div>
+        <div class="card-body">
+          <dl class="fields">
+          {% for section, fields in r.coded.items() %}
+            {% if fields is mapping %}
+              {% for path, value in fields.items() %}
+                <dt>{{ section }}.{{ path }}</dt><dd>{{ value }}</dd>
+              {% endfor %}
+            {% else %}
+              <dt>{{ section }}</dt><dd>{{ fields }}</dd>
+            {% endif %}
+          {% endfor %}
+          </dl>
+        </div>
+      </section>
       {% endif %}
-    {% endfor %}
-  </table>
+    </div>
+
+    <div class="stack">
+      <section class="card">
+        <div class="card-head"><h2>Hazards</h2></div>
+        <div class="card-body">
+          {% for h in r.hazards %}
+            <span class="chip {{ 'ground' if h.source == 'nasa' else 'model' }}">
+              {{ h.label }} · {{ "%.0f"|format(h.confidence * 100) }}%
+            </span>
+          {% else %}<p class="muted" style="margin:0">None assigned yet.</p>{% endfor %}
+          <p class="tiny" style="margin:var(--sp-3) 0 0">
+            Solid outline = assigned by a NASA analyst, and the ground truth our accuracy is
+            scored against. Italic = predicted by our model.
+          </p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Linked flight</h2></div>
+        <div class="card-body">
+          {% if r.linked_flight %}
+            <p style="margin:0 0 var(--sp-2)">
+              <strong>{{ r.linked_flight.carrier }}</strong>
+              {{ r.linked_flight.origin }} → {{ r.linked_flight.dest }}<br>
+              <span class="muted">{{ r.linked_flight.flight_date }}</span>
+            </p>
+            <span class="chip">Confidence {{ "%.0f"|format(r.linked_flight.confidence * 100) }}%</span>
+            <span class="chip">{{ r.linked_flight.method }}</span>
+          {% else %}
+            <p class="muted" style="margin:0">
+              No confident match. ASRS records are de-identified on purpose, so a link is
+              probabilistic and sometimes there isn't one — saying so is the honest output,
+              not a failure.
+            </p>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Record</h2></div>
+        <div class="card-body">
+          <dl class="fields" style="grid-template-columns:8rem 1fr">
+            <dt style="font-family:var(--sans);font-size:var(--t-small)">Reported</dt><dd>{{ r.report_date or "Undated" }}</dd>
+            <dt style="font-family:var(--sans);font-size:var(--t-small)">State</dt><dd>{{ r.state|capitalize }}</dd>
+            <dt style="font-family:var(--sans);font-size:var(--t-small)">Document</dt><dd>#{{ r.document_id }}</dd>
+          </dl>
+        </div>
+      </section>
+    </div>
+  </div>
 </div>
-{% endif %}

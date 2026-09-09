@@ -1,69 +1,126 @@
 {% extends "base.html" %}
 {% block title %}Upload &middot; Occurrence Desk{% endblock %}
 {% block content %}
-<div class="card">
-  <strong>Two-step upload.</strong>
-  <span class="muted">
-    The browser hashes the file, asks for a presigned POST, uploads straight to S3, then calls
-    <code>complete</code>. The API never sees the bytes, and <code>complete</code> returns
-    <strong>202</strong> without opening the PDF.
-  </span>
+<div class="page-head">
+  <div>
+    <h1>Upload a report set</h1>
+    <p>The file is hashed here, uploaded straight to object storage, and queued for parsing.
+       The API never sees the bytes.</p>
+  </div>
 </div>
 
-<div class="card">
-  <input type="file" id="file" accept="application/pdf">
-  <button id="go">Upload</button>
-  <p id="out" class="muted">Choose an ASRS report set PDF.</p>
-</div>
+<div class="card" style="max-width:44rem">
+  <div class="card-body">
+    <div id="drop" tabindex="0" role="button" aria-describedby="steps"
+         style="border:1.5px dashed var(--line);border-radius:var(--radius);padding:var(--sp-7) var(--sp-5);text-align:center;cursor:pointer">
+      <p style="margin:0 0 var(--sp-1);font-weight:600">Choose a PDF, or drop one here</p>
+      <p class="tiny" style="margin:0">ASRS report set · up to 25 MB</p>
+      <input id="file" type="file" accept="application/pdf" hidden>
+    </div>
 
+    <p id="chosen" class="muted" style="margin:var(--sp-3) 0 0;font-size:var(--t-small)"></p>
+
+    <ol id="steps" style="margin:var(--sp-4) 0 0;padding-left:1.2rem;font-size:var(--t-small);color:var(--ink-3)">
+      <li data-step="hash">Hash the file</li>
+      <li data-step="reserve">Reserve a document</li>
+      <li data-step="upload">Upload to object storage</li>
+      <li data-step="complete">Queue it for parsing</li>
+    </ol>
+
+    <p style="margin:var(--sp-4) 0 0">
+      <button id="go" class="btn" disabled>Upload</button>
+      <a class="btn secondary" href="/console">Back to worklist</a>
+    </p>
+    <p id="out" role="status" class="tiny" style="margin:var(--sp-3) 0 0;min-height:1.2em"></p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
 const API = "{{ api_prefix }}";
 const out = document.getElementById("out");
-const say = (m) => { out.textContent = m; };
+const drop = document.getElementById("drop");
+const input = document.getElementById("file");
+const go = document.getElementById("go");
+let file = null;
+
+const say = (m, bad) => { out.textContent = m; out.style.color = bad ? "var(--sev-critical)" : "var(--ink-2)"; };
+const mark = (step, state) => {
+  const li = document.querySelector(`[data-step="${step}"]`);
+  li.style.color = state === "done" ? "var(--sev-moderate)" : state === "active" ? "var(--ink)" : "var(--ink-3)";
+  li.style.fontWeight = state === "active" ? "600" : "400";
+};
+
+function choose(f) {
+  if (!f) return;
+  if (f.type !== "application/pdf") return say("That isn’t a PDF.", true);
+  file = f;
+  document.getElementById("chosen").textContent = `${f.name} · ${(f.size / 1048576).toFixed(1)} MB`;
+  go.disabled = false;
+  say("");
+}
+
+drop.onclick = () => input.click();
+drop.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } };
+input.onchange = () => choose(input.files[0]);
+drop.ondragover = (e) => { e.preventDefault(); drop.style.borderColor = "var(--accent)"; };
+drop.ondragleave = () => { drop.style.borderColor = "var(--line)"; };
+drop.ondrop = (e) => { e.preventDefault(); drop.style.borderColor = "var(--line)"; choose(e.dataTransfer.files[0]); };
 
 async function sha256Hex(buf) {
   const digest = await crypto.subtle.digest("SHA-256", buf);
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-document.getElementById("go").onclick = async () => {
-  const f = document.getElementById("file").files[0];
-  if (!f) return say("No file selected.");
-  const token = Session.token;
-  if (!token || Session.expired()) {
-    say("Not signed in.");
-    location.href = "/console/login?next=/console/upload";
-    return;
+go.onclick = async () => {
+  if (!file) return;
+  if (!Session.token || Session.expired()) { location.href = "/console/login?next=/console/upload"; return; }
+  go.disabled = true;
+
+  try {
+    mark("hash", "active"); say("Hashing…");
+    const sha256 = await sha256Hex(await file.arrayBuffer());
+    mark("hash", "done");
+
+    mark("reserve", "active"); say("Reserving a document…");
+    const r1 = await fetch(`${API}/documents/upload-url`, {
+      method: "POST",
+      headers: {"content-type": "application/json", authorization: `Bearer ${Session.token}`},
+      body: JSON.stringify({filename: file.name, byte_size: file.size, sha256}),
+    });
+    if (r1.status === 413) { mark("reserve", ""); return say("That file is larger than the 25 MB limit.", true); }
+    if (!r1.ok) { mark("reserve", ""); return say(`Couldn’t reserve a document (${r1.status}).`, true); }
+    const {document_id, url, fields, duplicate} = await r1.json();
+    mark("reserve", "done");
+
+    if (duplicate) {
+      mark("upload", "done");
+      say("Already uploaded — same SHA-256, so this is one document, not two.");
+    } else {
+      mark("upload", "active"); say("Uploading…");
+      const form = new FormData();
+      Object.entries(fields).forEach(([k, v]) => form.append(k, v));
+      form.append("file", file);
+      const r2 = await fetch(url, {method: "POST", body: form});
+      if (!r2.ok && r2.status !== 204) { mark("upload", ""); return say(`Object storage rejected the upload (${r2.status}).`, true); }
+      mark("upload", "done");
+    }
+
+    mark("complete", "active"); say("Queueing…");
+    const r3 = await fetch(`${API}/documents/${document_id}/complete`, {
+      method: "POST", headers: {authorization: `Bearer ${Session.token}`},
+    });
+    const body = await r3.json().catch(() => ({}));
+    if (r3.status === 503) { mark("complete", ""); return say("The parse queue is unreachable — nothing was lost, try again shortly.", true); }
+    if (r3.status !== 202) { mark("complete", ""); return say(body.detail || `Unexpected ${r3.status}.`, true); }
+    mark("complete", "done");
+    say(`Accepted. Document ${document_id}${body.enqueued ? "" : " was already queued"} — it will appear in the worklist once parsed.`);
+  } catch (e) {
+    say("Something went wrong: " + e.message, true);
+  } finally {
+    go.disabled = false;
   }
-
-  say("Hashing…");
-  const sha256 = await sha256Hex(await f.arrayBuffer());
-
-  say("Requesting a presigned POST…");
-  const r1 = await fetch(`${API}/documents/upload-url`, {
-    method: "POST",
-    headers: {"content-type": "application/json", authorization: `Bearer ${token}`},
-    body: JSON.stringify({filename: f.name, byte_size: f.size, sha256})
-  });
-  if (!r1.ok) return say(`upload-url failed: ${r1.status}`);
-  const {document_id, url, fields, duplicate} = await r1.json();
-
-  if (!duplicate) {
-    say("Uploading to object storage…");
-    const form = new FormData();
-    Object.entries(fields).forEach(([k, v]) => form.append(k, v));
-    form.append("file", f);
-    const r2 = await fetch(url, {method: "POST", body: form});
-    if (!r2.ok && r2.status !== 204) return say(`S3 rejected the upload: ${r2.status}`);
-  }
-
-  const r3 = await fetch(`${API}/documents/${document_id}/complete`, {
-    method: "POST", headers: {authorization: `Bearer ${token}`}
-  });
-  const body = await r3.json();
-  say(`${r3.status} ${r3.status === 202 ? "Accepted" : ""} — document ${document_id}, `
-      + `enqueued=${body.enqueued}${duplicate ? " (duplicate: same sha256, one row)" : ""}. `
-      + `trace_id ${body.trace_id}`);
 };
 </script>
 {% endblock %}

@@ -13,9 +13,10 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from services.api import metrics, problems
+from services.api import metrics, presentation, problems
 from services.api.deps import analyst, get_repo
 from services.api.problems import ApiProblem, problem_response
 from services.api.routers import auth, documents, ops, queue, reports
@@ -36,9 +37,8 @@ app = FastAPI(
 
 API_PREFIX = "/api/v1"
 PAGE_SIZE = 25
-TEMPLATES = Jinja2Templates(
-    directory=str(Path(__file__).resolve().parents[2] / "web" / "templates")
-)
+WEB = Path(__file__).resolve().parents[2] / "web"
+TEMPLATES = Jinja2Templates(directory=str(WEB / "templates"))
 
 
 @app.middleware("http")
@@ -93,6 +93,10 @@ app.include_router(ops.router)  # /healthz /readyz /metrics stay unversioned for
 
 metrics.build_info.labels(version=settings.app_version).set(1)
 
+# Vendored, not a CDN: the console has to render with the wifi off, and a blocked
+# script would leave the worklist saying "loading" forever.
+app.mount("/static", StaticFiles(directory=str(WEB / "static")), name="static")
+
 
 # --- the analyst console ------------------------------------------------------
 # Server-rendered Jinja2 + HTMX. A page that renders on the server cannot show a spinner
@@ -101,7 +105,9 @@ metrics.build_info.labels(version=settings.app_version).set(1)
 
 @app.get("/console", include_in_schema=False)
 def console(request: Request):
-    return TEMPLATES.TemplateResponse(request, "worklist.html", {"api_prefix": API_PREFIX})
+    return TEMPLATES.TemplateResponse(
+        request, "worklist.html", {"api_prefix": API_PREFIX, "nav": "worklist"}
+    )
 
 
 @app.get("/console/login", include_in_schema=False)
@@ -111,7 +117,9 @@ def console_login(request: Request):
 
 @app.get("/console/upload", include_in_schema=False)
 def console_upload(request: Request):
-    return TEMPLATES.TemplateResponse(request, "upload.html", {"api_prefix": API_PREFIX})
+    return TEMPLATES.TemplateResponse(
+        request, "upload.html", {"api_prefix": API_PREFIX, "nav": "upload"}
+    )
 
 
 @app.get("/console/reports/{report_id}", include_in_schema=False)
@@ -153,6 +161,8 @@ def worklist_fragment(
             "synopsis": r.synopsis,
             "report_date": r.report_date,
             "priority": repo.priority(r),
+            "level": presentation.level(repo.priority(r))[0],
+            "level_label": presentation.level(repo.priority(r))[1],
             "state": r.state,
             "hazards": r.hazards,
         }
@@ -195,10 +205,54 @@ def report_fragment(
         ),
         dt.date.today(),
     )
+    band, band_label = presentation.level(why["priority"])
     return TEMPLATES.TemplateResponse(
         request,
         "_report.html",
-        {"api_prefix": API_PREFIX, "r": r, "why": why},
+        {
+            "api_prefix": API_PREFIX,
+            "r": r,
+            "why": why,
+            "level": band,
+            "level_label": band_label,
+        },
+    )
+
+
+@app.get("/console/fragments/stats", include_in_schema=False)
+def stats_fragment(
+    request: Request,
+    p: Principal = Depends(analyst),
+    repo=Depends(get_repo),
+):
+    """What an analyst actually wants at the top of the screen.
+
+    This replaces the block of SQL-shaped text that used to sit there. Queue depth is
+    manager-only, so analysts simply do not see those two tiles - the page does not
+    show an empty box where a permission used to be.
+    """
+    rows = repo.list_reports(cursor=None, page_size=1000)
+    priorities = sorted((repo.priority(r) for r in rows), reverse=True)
+    queue = None
+    if p.has("manager"):
+        from services.api.queue_stats import MIN_MEANINGFUL_THROUGHPUT_PER_MIN, drain_eta_seconds
+
+        throughput = float(repo.parsed_in_last_60s())
+        eta = drain_eta_seconds(0, throughput)
+        queue = {
+            "visible": 0,
+            "estimating": throughput < MIN_MEANINGFUL_THROUGHPUT_PER_MIN,
+            "eta_minutes": round((eta or 0) / 60),
+        }
+    return TEMPLATES.TemplateResponse(
+        request,
+        "_stats.html",
+        {
+            "open_count": sum(1 for r in rows if r.state in ("new", "triaged")),
+            "high_count": sum(1 for v in priorities if v >= 70),
+            "top_priority": priorities[0] if priorities else None,
+            "queue": queue,
+        },
     )
 
 

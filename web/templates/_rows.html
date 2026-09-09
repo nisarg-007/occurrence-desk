@@ -1,23 +1,32 @@
 {% for r in items %}
-<tr>
-  <td class="pri {% if r.priority >= 70 %}pri-hi{% elif r.priority >= 40 %}pri-mid{% else %}pri-lo{% endif %}">
-    {{ r.priority }}
+<tr data-href="/console/reports/{{ r.id }}">
+  <td>
+    <span class="sev" data-level="{{ r.level }}">
+      <span class="score">{{ r.priority }}</span>
+      <span class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span class="label">{{ r.level_label }}</span>
+    </span>
   </td>
-  <td><a href="/console/reports/{{ r.id }}">{{ r.acn }}</a></td>
-  <td>{{ r.synopsis or "—" }}
-      <a class="muted" href="/console/reports/{{ r.id }}" title="why is this here?">why</a></td>
-  <td>{% for h in r.hazards %}<span class="chip">{{ h.label }}</span>{% endfor %}</td>
-  <td class="muted">{{ r.report_date or "—" }}</td>
-  <td><span class="chip">{{ r.state }}</span></td>
+  <td><a class="row-link" href="/console/reports/{{ r.id }}">{{ r.acn }}</a></td>
+  <td>{{ r.synopsis or "No synopsis" }}</td>
+  <td>
+    {% for h in r.hazards %}<span class="chip {{ 'ground' if h.source == 'nasa' else 'model' }}">{{ h.label }}</span>{% else %}<span class="tiny">Unclassified</span>{% endfor %}
+  </td>
+  <td class="num muted">{{ r.report_date or "—" }}</td>
+  <td><span class="state">{{ r.state|capitalize }}</span></td>
 </tr>
 {% else %}
-<tr><td colspan="6" class="muted">No reports yet. Upload a report set to fill the queue.</td></tr>
+<tr><td colspan="6">
+  <div class="state-block">
+    <h3>Nothing in the queue</h3>
+    <p>Upload an ASRS report set and parsed reports will appear here as they finish.</p>
+    <a class="btn" href="/console/upload">Upload a report set</a>
+  </div>
+</td></tr>
 {% endfor %}
 {% if next_cursor %}
-<tr id="more">
-  <td colspan="6">
-    <button hx-get="/console/fragments/worklist?cursor={{ next_cursor }}"
-            hx-target="#more" hx-swap="outerHTML">Load more</button>
-  </td>
-</tr>
+<tr id="more"><td colspan="6" style="text-align:center">
+  <button class="btn secondary" hx-get="/console/fragments/worklist?cursor={{ next_cursor }}"
+          hx-target="#more" hx-swap="outerHTML">Load more</button>
+</td></tr>
 {% endif %}

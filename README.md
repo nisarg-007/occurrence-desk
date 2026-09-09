@@ -156,6 +156,12 @@ password `occdesk-local`. Sign in at `/console/login`.
 | `/console/upload` | hashes the file in the browser, uploads straight to S3, then calls `complete` |
 | `/console/login` | sign in; the token lives in `localStorage` and every HTMX request carries it |
 
+Priority is never communicated by colour alone: every score carries a band name in text
+(Critical / High / Moderate / Low) and a four-step meter, so the ranking survives colour
+blindness, a greyscale printout and a screen reader. All colour pairs are contrast-checked
+(worst 5.0:1 against a 4.5:1 target) in both light and dark, and htmx is vendored rather than
+loaded from a CDN so the console renders with the network off.
+
 Page shells carry no data. A browser navigation cannot send a bearer token, so each page loads
 an **authenticated fragment** — the fragments are protected exactly like the API they render.
 

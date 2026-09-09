@@ -11,7 +11,10 @@ Format: `| date | what | value | command | who |`
 | Date | What | Value | Command | Who |
 |---|---|---|---|---|
 | 2026-09-08 | Contract + implementation agree (no drift) | 6/6 conformance tests pass | `pytest tests/contract/test_spec_conformance.py` | Nisarg |
-| 2026-09-09 | API test suite, M1 stub repository | 79 passed, 2 skipped (e2e — needs a live stack) | `pytest` | Nisarg |
+| 2026-09-09 | API test suite, M1 stub repository | 85 passed, 2 skipped (e2e — needs a live stack) | `pytest` | Nisarg |
+| 2026-09-09 | Console redesign: contrast of every text/surface pair | worst pair **5.0:1** (light `--ink-3`), target 4.5:1 | `python3 /tmp/contrast.py`, values recorded in `web/static/css/console.css` | Nisarg |
+| 2026-09-09 | Console redesign: rendered in Chromium, light + dark, 4 pages | 0 console errors, 0 failed requests | `playwright` screenshot pass | Nisarg |
+| 2026-09-09 | Row link hit target | 63 × 28 px (desktop minimum 28 × 28) | `elementFromPoint` probe | Nisarg |
 | 2026-09-09 | Clean-clone boot: runtime deps only, every page 200 | `/ /healthz /console /console/login /console/upload /console/reports/1 /docs /metrics` all 200 | `pip install -r requirements.txt && uvicorn services.api.main:app` | Nisarg |
 | 2026-09-08 | `complete` handler cost, **in-process floor** — no network, S3, SQS or database | mean 4.18 ms, p50 4.02, p95 5.10, p99 6.35, max 35.37 (n=400, 25 warmup discarded) | `python tests/bench/bench_submit.py --iterations 400` | Nisarg |
 | 2026-09-08 | Lint and format | clean | `ruff check . && ruff format --check .` | Nisarg |
@@ -56,6 +59,18 @@ Format: `| date | what | value | command | who |`
 | | `make cloud-down` then restore, wall time | rehearse in week 8, not at 1am | `time make cloud-down` | pending |
 | | CI wall time | **target < 8 min** | GitHub Actions run summary | pending |
 | | Month-to-date cost by service | **every Friday** | Cost Explorer, grouped by service | pending |
+
+## What the design numbers mean
+
+Contrast was computed, not judged: every colour pair in the console stylesheet was run
+through the WCAG relative-luminance formula before it was written down, and the ratio is in
+a comment beside it. The old palette had three colours that failed in light mode (amber at
+1.6:1, green at 2.1:1, red at 2.8:1) because only the dark palette was ever looked at.
+
+The rendered check matters as much as the computed one. Three defects in this pass were only
+visible in a screenshot: a fabricated Subresource Integrity hash that silently blocked htmx
+(the worklist said "loading" forever), a sticky table header that swallowed row clicks, and
+ranking bars squeezed to 91 px in a side column. None of them would have failed a unit test.
 
 ## Reading the floor number honestly
 

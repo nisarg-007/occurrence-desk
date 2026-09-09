@@ -8,7 +8,11 @@ from __future__ import annotations
 
 import pytest
 
-FRAGMENTS = ["/console/fragments/worklist", "/console/fragments/report/1"]
+FRAGMENTS = [
+    "/console/fragments/worklist",
+    "/console/fragments/report/1",
+    "/console/fragments/stats",
+]
 PAGES = ["/console", "/console/login", "/console/upload", "/console/reports/1"]
 
 
@@ -46,11 +50,45 @@ def test_worklist_fragment_shows_the_highest_priority_first(client, analyst_head
 
 
 def test_report_fragment_shows_the_four_terms_and_the_score(client, analyst_headers):
+    """Term names are shown as words, not as the API's snake_case field names - the
+    analyst is not reading a JSON payload."""
     body = client.get("/console/fragments/report/1", headers=analyst_headers).text
-    for term in ("severity", "link_confidence", "recency", "manager_flag"):
-        assert term in body
+    for term in ("Severity", "Link confidence", "Recency", "Manager flag"):
+        assert term in body, f"{term} missing from the breakdown"
     priority = client.get("/api/v1/reports/1", headers=analyst_headers).json()["priority"]
     assert str(priority) in body
+
+
+def test_severity_is_never_communicated_by_colour_alone(client, analyst_headers):
+    """A band name in text plus a four-step meter, so the ranking survives colour
+    blindness, a greyscale printout, and a screen reader."""
+    body = client.get("/console/fragments/worklist", headers=analyst_headers).text
+    assert 'data-level="critical"' in body
+    assert "Critical" in body
+    assert '<span class="meter"' in body
+
+
+def test_worklist_rows_link_to_the_console_not_the_raw_api(client, analyst_headers):
+    body = client.get("/console/fragments/worklist", headers=analyst_headers).text
+    assert "/console/reports/" in body
+    assert 'href="/api/v1/reports/' not in body
+
+
+def test_stats_fragment_hides_queue_tiles_from_an_analyst(client, analyst_headers, manager_headers):
+    """Queue depth is manager-only. An analyst sees a shorter strip, not an empty box
+    where a permission used to be."""
+    a = client.get("/console/fragments/stats", headers=analyst_headers)
+    m = client.get("/console/fragments/stats", headers=manager_headers)
+    assert a.status_code == m.status_code == 200
+    assert "Waiting to parse" not in a.text
+    assert "Waiting to parse" in m.text
+
+
+def test_the_console_does_not_show_sql_to_an_analyst(client):
+    """The worklist page used to open with `priority DESC, report_date DESC, id DESC`.
+    That is a note to the team, not information for the person doing the triage."""
+    body = client.get("/console").text
+    assert "DESC" not in body
 
 
 def test_report_fragment_is_404_for_an_unknown_report(client, analyst_headers):

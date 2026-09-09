@@ -1,32 +1,63 @@
 {% extends "base.html" %}
 {% block title %}Worklist &middot; Occurrence Desk{% endblock %}
 {% block content %}
-<div class="card">
-  <strong>Ranked queue.</strong>
-  <span class="muted">
-    Ordered by <code>priority DESC, report_date DESC, id DESC</code>, keyset paged &mdash; page 100
-    costs the same as page 1. Priority is
-    <code>100 &times; (0.45&middot;severity + 0.25&middot;link + 0.20&middot;recency + 0.10&middot;flag)</code>;
-    open <code>/why</code> on any row for the four terms.
-  </span>
+<div class="page-head">
+  <div>
+    <h1>Worklist</h1>
+    <p>Highest priority first. Open a report to see why it ranks where it does.</p>
+  </div>
 </div>
 
-<table>
-  <thead>
-    <tr>
-      <th style="width:4rem">Pri</th>
-      <th style="width:7rem">ACN</th>
-      <th>Synopsis</th>
-      <th style="width:9rem">Hazard</th>
-      <th style="width:7rem">Date</th>
-      <th style="width:6rem">State</th>
-    </tr>
-  </thead>
-  <tbody id="worklist"
-         hx-get="/console/fragments/worklist"
-         hx-trigger="load, every 5s"
-         hx-swap="innerHTML">
-    <tr><td colspan="6" class="muted">loading&hellip;</td></tr>
-  </tbody>
-</table>
+<div class="stack">
+  <div class="card">
+    <div class="strip" id="stats" hx-get="/console/fragments/stats" hx-trigger="load, every 10s"
+         hx-swap="innerHTML" aria-live="polite">
+      <div class="stat"><div class="k">Open reports</div><div class="v"><span class="skeleton" style="width:3ch;display:inline-block"></span></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-wrap">
+      <table class="data">
+        <caption class="tiny" style="text-align:left;padding:var(--sp-3) var(--sp-4) 0">
+          Refreshes every five seconds.
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col" style="width:9rem">Priority</th>
+            <th scope="col" style="width:8rem">ACN</th>
+            <th scope="col">Summary</th>
+            <th scope="col" style="width:12rem">Hazard</th>
+            <th scope="col" style="width:7rem">Reported</th>
+            <th scope="col" style="width:6rem">State</th>
+          </tr>
+        </thead>
+        <tbody id="worklist"
+               hx-get="/console/fragments/worklist"
+               hx-trigger="load, every 5s"
+               hx-swap="innerHTML"
+               aria-live="polite" aria-busy="true">
+          <tr><td colspan="6"><span class="skeleton" style="width:40%"></span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <details class="explain">
+    <summary>How the ranking works</summary>
+    <div class="card"><div class="card-body">
+      <p class="muted" style="margin-top:0">
+        Priority is a score out of 100, recomputed on every read, from four things:
+        how severe the worst hazard on the report is (45 points), how confidently the report
+        is matched to a real flight (25), how recently it was filed (20), and whether a
+        manager flagged it (10).
+      </p>
+      <p class="muted" style="margin-bottom:0">
+        Nothing is hidden: every report shows its own arithmetic. The list is ordered by
+        priority, then report date, then id, and paged on that position rather than by
+        row offset, so page 100 costs the same as page 1.
+      </p>
+    </div></div>
+  </details>
+</div>
 {% endblock %}

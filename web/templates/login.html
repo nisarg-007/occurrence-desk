@@ -1,46 +1,59 @@
 {% extends "base.html" %}
 {% block title %}Sign in &middot; Occurrence Desk{% endblock %}
 {% block content %}
-<div class="card" style="max-width:26rem">
-  <h2 style="margin-top:0;font-size:1rem">Sign in</h2>
-  <p>
-    <input id="email" type="email" placeholder="you@example.com" autocomplete="username"
-           style="width:100%;padding:.5rem;margin-bottom:.5rem">
-    <input id="password" type="password" placeholder="password" autocomplete="current-password"
-           style="width:100%;padding:.5rem">
-  </p>
-  <button id="go">Sign in</button>
-  <p id="out" class="muted"></p>
+<div class="card" style="max-width:24rem;margin:var(--sp-7) auto">
+  <div class="card-head"><h2>Sign in</h2></div>
+  <div class="card-body">
+    <form id="signin" novalidate>
+      <p style="margin:0 0 var(--sp-3)">
+        <label for="email" style="display:block;font-size:var(--t-small);font-weight:550;margin-bottom:var(--sp-1)">Email</label>
+        <input id="email" name="email" type="email" autocomplete="username" required
+               placeholder="analyst@occdesk.example" aria-describedby="err"
+               style="width:100%;min-height:36px;padding:0 var(--sp-3);border:1px solid var(--line);border-radius:var(--radius-s);background:var(--surface);color:var(--ink);font:var(--t-body) var(--sans)">
+      </p>
+      <p style="margin:0 0 var(--sp-4)">
+        <label for="password" style="display:block;font-size:var(--t-small);font-weight:550;margin-bottom:var(--sp-1)">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required
+               style="width:100%;min-height:36px;padding:0 var(--sp-3);border:1px solid var(--line);border-radius:var(--radius-s);background:var(--surface);color:var(--ink);font:var(--t-body) var(--sans)">
+      </p>
+      <button class="btn" type="submit" style="width:100%">Sign in</button>
+      <p id="err" role="alert" class="tiny" style="margin:var(--sp-3) 0 0;min-height:1.2em;color:var(--sev-critical)"></p>
+    </form>
+  </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
 const API = "{{ api_prefix }}";
-const out = document.getElementById("out");
+const err = document.getElementById("err");
 const params = new URLSearchParams(location.search);
 
-async function signIn() {
-  out.textContent = "Signing in…";
-  const r = await fetch(`${API}/auth/login`, {
-    method: "POST",
-    headers: {"content-type": "application/json"},
-    body: JSON.stringify({
-      email: document.getElementById("email").value,
-      password: document.getElementById("password").value,
-    }),
-  });
-  if (!r.ok) {
-    // The API deliberately does not say which half was wrong; the console must not either.
-    out.textContent = "Email or password is incorrect.";
-    return;
+document.getElementById("signin").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const btn = ev.target.querySelector("button");
+  btn.disabled = true; btn.textContent = "Signing in…"; err.textContent = "";
+  try {
+    const r = await fetch(`${API}/auth/login`, {
+      method: "POST", headers: {"content-type": "application/json"},
+      body: JSON.stringify({
+        email: document.getElementById("email").value,
+        password: document.getElementById("password").value,
+      }),
+    });
+    if (!r.ok) {
+      // The API deliberately does not say which half was wrong. Neither does this.
+      err.textContent = "Email or password is incorrect.";
+      return;
+    }
+    Session.token = (await r.json()).access_token;
+    const next = params.get("next");
+    location.href = next && next.startsWith("/console") ? next : "/console";
+  } catch {
+    err.textContent = "Couldn’t reach the server. Is it still running?";
+  } finally {
+    btn.disabled = false; btn.textContent = "Sign in";
   }
-  Session.token = (await r.json()).access_token;
-  const next = params.get("next");
-  location.href = next && next.startsWith("/console") ? next : "/console";
-}
-
-document.getElementById("go").onclick = signIn;
-document.getElementById("password").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") signIn();
 });
 </script>
 {% endblock %}
