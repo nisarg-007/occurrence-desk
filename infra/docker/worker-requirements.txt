@@ -1,0 +1,4 @@
+# Worker branch imports these but currently omits them from requirements.txt.
+pdfplumber==0.11.4
+scikit-learn==1.6.1
+joblib==1.4.2
