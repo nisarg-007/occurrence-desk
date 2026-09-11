@@ -28,3 +28,9 @@ data/
 .DS_Store
 .idea/
 .vscode/
+
+# worker scratch/debug output (regenerate with extract_records.py /
+# local_stack_test.py) and the trained classifier binary (regenerate with
+# classifier.py) - neither belongs in git, both are one command away
+services/worker/output/
+services/worker/model/
