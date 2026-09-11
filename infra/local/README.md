@@ -102,8 +102,8 @@ for explicit `destroy`. Nothing erases an existing database merely by starting t
 
 Dockerfiles use multi-stage builds, non-root UID 10001, versioned base images and cached
 dependency layers. The worker installs its currently missing parsing/ML dependencies in
-a separate infrastructure-owned requirements file. Image size <300 MB is a target,
-not a measured result; measure after Docker builds, especially with scikit-learn installed.
+a separate infrastructure-owned requirements file. Live Docker validation and reported image sizes are recorded in VALIDATION.md.
+Both runtime images built below the 300 MB target on the tested Linux/amd64 setup.
 
 Cloud Terraform, AWS deployment pipelines, OIDC and cost reporting belong to later milestones.
 

@@ -19,5 +19,6 @@ FROM runtime AS tools
 USER root
 COPY requirements-dev.txt ./
 RUN pip install -r requirements-dev.txt
+ENV PYTEST_ADDOPTS="-o cache_dir=/tmp/pytest-cache"
 USER app
 CMD ["python", "-m", "pytest", "-q"]
