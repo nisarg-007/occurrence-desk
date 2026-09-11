@@ -41,9 +41,13 @@ def init():
 def docker():
     binary = shutil.which("docker")
     if not binary and os.name == "nt":
-        candidate = Path("C:/Program Files/Docker/Docker/resources/bin/docker.exe")
-        if candidate.exists():
-            binary = str(candidate)
+        candidates = [Path("C:/Program Files/Docker/Docker/resources/bin/docker.exe")]
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            candidates.append(
+                Path(local_app_data) / "Programs/DockerDesktop/resources/bin/docker.exe"
+            )
+        binary = next((str(path) for path in candidates if path.is_file()), None)
     if not binary:
         raise SystemExit(
             "Docker is missing. Install and start Docker Desktop with Linux containers."
