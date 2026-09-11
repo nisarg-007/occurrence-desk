@@ -1,5 +1,7 @@
-"""Unit tests for services/worker/store.py - the temporary stand-in for
-Parva's real documents/reports tables (see the module docstring there).
+"""Unit tests for the worker store's JSON backend (services/worker/json_store.py),
+driven through the `store` dispatcher so these exercise the same call surface
+`worker.py` uses. The SQL backend is covered by tests/integration/, which needs
+a live Postgres; this file must keep passing on a clean clone with no database.
 
 The most important test here (test_failed_document_can_be_reclaimed_for_retry)
 is a regression test for a real bug: the work-pack's own claim-query
@@ -14,12 +16,13 @@ from __future__ import annotations
 
 import pytest
 
-from services.worker import store
+from services.worker import json_store, store
 
 
 @pytest.fixture(autouse=True)
 def isolated_state(tmp_path, monkeypatch):
-    monkeypatch.setattr(store, "STATE_PATH", tmp_path / "worker_state.json")
+    monkeypatch.setenv("OCCDESK_WORKER_STORE", "json")
+    monkeypatch.setattr(json_store, "STATE_PATH", tmp_path / "worker_state.json")
 
 
 def test_claim_then_parse_then_cannot_reclaim():

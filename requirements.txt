@@ -13,3 +13,8 @@ sqlalchemy==2.0.36
 alembic==1.14.0
 psycopg[binary]==3.2.3
 httpx==0.28.1
+
+# worker lane: pdfplumber parser + the TF-IDF/LinearSVC hazard classifier
+pdfplumber==0.11.4
+scikit-learn==1.6.1
+joblib==1.4.2

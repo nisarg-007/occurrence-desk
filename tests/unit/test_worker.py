@@ -12,7 +12,7 @@ import json
 
 import pytest
 
-from services.worker import store, worker
+from services.worker import json_store, store, worker
 
 QUEUE_URL = "http://queue.example/main"
 
@@ -30,7 +30,8 @@ class FakeSQS:
 
 @pytest.fixture(autouse=True)
 def isolated_state(tmp_path, monkeypatch):
-    monkeypatch.setattr(store, "STATE_PATH", tmp_path / "worker_state.json")
+    monkeypatch.setenv("OCCDESK_WORKER_STORE", "json")
+    monkeypatch.setattr(json_store, "STATE_PATH", tmp_path / "worker_state.json")
 
 
 @pytest.fixture(autouse=True)

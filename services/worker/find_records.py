@@ -1,4 +1,4 @@
-       """
+"""
 Stage 2: find where each individual report starts and ends inside the PDF.
 
 The report-set PDF actually contains TWO things that both look like a record

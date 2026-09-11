@@ -1,6 +1,5 @@
 """Launch the worker with main-loop liveness and visible integration errors."""
 
-import inspect
 import time
 from pathlib import Path
 
@@ -10,10 +9,12 @@ def main():
         from services.worker import store, worker
     except ModuleNotFoundError as exc:
         raise SystemExit(f"Missing worker implementation or dependency: {exc.name}") from None
-    if "worker_state.json" in inspect.getsource(store):
+    if store.backend_name() != "sql":
         raise SystemExit(
-            "Integration needed: Smit must replace JSON worker storage with the "
-            "shared PostgreSQL database before the M1 stack can run."
+            "Integration needed: the worker resolved its store to "
+            f"{store.backend_name()!r}, not the shared PostgreSQL database. "
+            "Set DATABASE_URL (or OCCDESK_WORKER_STORE=sql) - refusing to call a "
+            "JSON file on a container's own disk the M1 stack."
         )
     from services.common.logging import configure
 
