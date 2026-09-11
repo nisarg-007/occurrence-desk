@@ -50,6 +50,8 @@ Format: `| date | what | value | command | who |`
 
 | Date | What | Value | Command | Who |
 |---|---|---|---|---|
+| 2026-09-11 | Local ElasticMQ queue verified reachable + message round-trip | send/purge confirmed via dashboard "Waiting to parse" 0 -> 1 -> 0 | `curl ... Action=SendMessage` + `ops/setup-local-queue.sh` | Sowmya |
+| 2026-09-11 | Local load test, submit endpoint, 5 concurrent users, 62 requests | 0% failures; `/documents/upload-url` median 17ms, p95 30ms, p99 72ms, max 72ms | `locust -f services/replay/locustfile.py --host http://127.0.0.1:8000` | Sowmya |
 | | Autoscaling target = acceptable latency ÷ mean parse time | show the arithmetic | — | pending |
 | | Submit p50 / p95 / p99 through the burst, vs baseline | | Locust | pending |
 | | HTTP error rate through the burst | **target: zero 5xx** | Locust | pending |
