@@ -1,0 +1,130 @@
+name: occurrence-desk
+
+x-environment: &environment
+  APP_ENV: local
+  AWS_REGION: us-east-1
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_EC2_METADATA_DISABLED: "true"
+  AWS_ACCESS_KEY_ID: ${LOCAL_S3_USER:?Run python infra/local/manage.py init}
+  AWS_SECRET_ACCESS_KEY: ${LOCAL_S3_PASSWORD:?Run python infra/local/manage.py init}
+  DATABASE_URL: postgresql+psycopg://occdesk:${LOCAL_DB_PASSWORD:?Run init}@db:5432/occdesk
+  S3_ENDPOINT_URL: http://minio:9000
+  S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
+  S3_BUCKET: occdesk-dev-docs
+  SQS_ENDPOINT_URL: http://elasticmq:9324
+  SQS_QUEUE_URL: http://elasticmq:9324/000000000000/occdesk-dev-parse
+  SQS_DLQ_URL: http://elasticmq:9324/000000000000/occdesk-dev-parse-dlq
+  JWT_SECRET: ${LOCAL_JWT_SECRET:?Run init}
+  LOG_LEVEL: INFO
+
+x-api-build: &api-build
+  context: .
+  dockerfile: infra/docker/api.Dockerfile
+  target: runtime
+
+services:
+  db:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_DB: occdesk
+      POSTGRES_USER: occdesk
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:?Run init}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U occdesk -d occdesk"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${LOCAL_S3_USER:?Run init}
+      MINIO_ROOT_PASSWORD: ${LOCAL_S3_PASSWORD:?Run init}
+      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:8000,http://127.0.0.1:8000
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    volumes: ["minio-data:/data"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  elasticmq:
+    image: softwaremill/elasticmq:1.6.15
+    volumes:
+      - ./infra/local/elasticmq.conf:/opt/elasticmq.conf:ro
+      - queue-data:/data
+    ports: ["127.0.0.1:9324:9324"]
+    restart: unless-stopped
+
+  dependencies-ready:
+    build: *api-build
+    environment: *environment
+    command: ["python", "-m", "infra.local.health", "dependencies", "--wait"]
+    depends_on:
+      db: {condition: service_healthy}
+      minio: {condition: service_healthy}
+      elasticmq: {condition: service_started}
+    healthcheck: {disable: true}
+
+  bootstrap:
+    build: *api-build
+    environment: *environment
+    command: ["python", "-m", "infra.local.bootstrap"]
+    depends_on:
+      dependencies-ready: {condition: service_completed_successfully}
+    healthcheck: {disable: true}
+
+  migrate:
+    profiles: [app]
+    build: *api-build
+    environment: *environment
+    command: ["python", "-m", "infra.local.migrate"]
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
+    healthcheck: {disable: true}
+
+  api:
+    profiles: [app]
+    build: *api-build
+    environment: *environment
+    ports: ["127.0.0.1:8000:8000"]
+    command: ["python", "-m", "infra.local.api_entry"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    restart: "no"
+
+  worker:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: infra/docker/worker.Dockerfile
+    environment: *environment
+    init: true
+    stop_grace_period: 60s
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    restart: "no"
+
+  tools:
+    profiles: [tools]
+    build:
+      <<: *api-build
+      target: tools
+    environment:
+      <<: *environment
+      E2E_BASE_URL: http://api:8000
+    volumes:
+      - ./data:/data:ro
+      - ./tests/e2e/fixtures:/app/tests/e2e/fixtures:ro
+    healthcheck: {disable: true}
+
+volumes:
+  postgres-data:
+  minio-data:
+  queue-data:
