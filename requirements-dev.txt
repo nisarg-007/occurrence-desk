@@ -6,3 +6,4 @@ mypy==1.14.1
 types-python-jose==3.3.4.20240106
 pyyaml==6.0.2
 reportlab==4.4.10
+reportlab==4.4.10
