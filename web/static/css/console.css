@@ -409,3 +409,378 @@ code, kbd { font-family: var(--mono); font-size: .92em;
 details.explain summary { cursor: pointer; font-size: var(--t-small);
   color: var(--ink-2); padding: var(--sp-2) 0; }
 details.explain[open] summary { color: var(--ink); font-weight: 550; }
+
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Apple HIG UI/UX upgrade layer
+   Principles applied: Simplicity, Craft, Familiarity, Flexibility
+   All contrast ratios are preserved from the existing token set.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ---------- refined masthead ------------------------------------------ */
+/* Taller, more generous — matches macOS toolbar proportions (44pt equivalent) */
+.masthead {
+  padding: 0 var(--sp-5);
+  height: 52px;
+  gap: var(--sp-4);
+}
+
+.wordmark {
+  font-size: var(--t-lead);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+.wordmark .dot {
+  width: 9px; height: 9px;
+  border-radius: 2.5px;
+  background: var(--accent-fill);
+}
+
+/* Tab links — pill shape, SF-style active state */
+.tabs {
+  gap: 2px;
+}
+.tabs a,
+.tabs-ai-btn {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  min-height: 34px;
+  padding: 0 var(--sp-3);
+  border-radius: 8px;
+  font-size: var(--t-small);
+  font-weight: 550;
+  color: var(--ink-2);
+  text-decoration: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.tabs a:hover,
+.tabs-ai-btn:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+}
+.tabs a[aria-current="page"] {
+  background: color-mix(in srgb, var(--accent-fill) 14%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* AI button — distinct from nav links, matches SF action button style */
+.tabs-ai-btn {
+  border: none;
+  background: color-mix(in srgb, var(--accent-fill) 12%, transparent);
+  color: var(--accent);
+  font-family: var(--sans);
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0 var(--sp-3);
+}
+.tabs-ai-btn:hover {
+  background: color-mix(in srgb, var(--accent-fill) 22%, transparent);
+  color: var(--accent);
+}
+.tabs-ai-btn[aria-expanded="true"] {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+/* ---------- cards — tighter radius, softer shadow (iOS/macOS card) ---- */
+.card {
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 0.5px color-mix(in srgb, var(--ink) 8%, transparent),
+    0 2px 8px -2px color-mix(in srgb, var(--ink) 10%, transparent),
+    0 8px 24px -8px color-mix(in srgb, var(--ink) 8%, transparent);
+  border: none;
+}
+.card > .card-head {
+  padding: var(--sp-4) var(--sp-5) var(--sp-3);
+}
+.card > .card-head h2 {
+  font-size: var(--t-small);
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+}
+
+/* ---------- table — zero borders on cells, row hover like iOS lists --- */
+table.data {
+  border-radius: 12px;
+  overflow: hidden;
+}
+table.data thead th {
+  background: var(--surface-2);
+  font-size: var(--t-micro);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--line-soft);
+}
+table.data td {
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 0.5px solid var(--line-soft);
+  vertical-align: middle;
+}
+table.data tbody tr:last-child td {
+  border-bottom: none;
+}
+table.data tbody tr:hover td {
+  background: color-mix(in srgb, var(--accent-fill) 5%, var(--surface));
+}
+
+/* ---------- buttons — Apple tappable size, pill radius --------------- */
+.btn {
+  min-height: 36px;
+  padding: 0 var(--sp-4);
+  border-radius: 8px;
+  font-size: var(--t-small);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: filter 0.1s ease, opacity 0.1s ease;
+}
+.btn:active { filter: brightness(0.92); }
+.btn.secondary {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border: none;
+  color: var(--ink);
+}
+.btn.secondary:hover {
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  filter: none;
+}
+
+/* ---------- stat tiles — more visual breathing room ------------------- */
+.stat .k {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: var(--sp-1);
+}
+.stat .v {
+  font-size: var(--t-h2);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+/* ---------- chips — capsule pill, label style ----------------------- */
+.chip {
+  border-radius: 6px;
+  padding: 3px var(--sp-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border: none;
+  color: var(--ink-2);
+}
+
+/* ---------- forms (login, upload) — inset field look ----------------- */
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+  height: 44px;               /* iOS minimum tap target */
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font: var(--t-body)/1 var(--sans);
+  width: 100%;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus {
+  outline: none;
+  border-color: var(--accent-fill);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-fill) 20%, transparent);
+}
+
+/* ---------- page headings — larger, tighter tracking ----------------- */
+.page-head h1 {
+  font-size: var(--t-h1);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+/* ---------- AI Chat Panel ────────────────────────────────────────────
+   Design: floating sheet anchored bottom-right, Liquid Glass masthead,
+   SF-style message bubbles. Matches iOS Messages / macOS Finder sidebar
+   aesthetic without being decorative.
+   ──────────────────────────────────────────────────────────────────── */
+.chat-backdrop {
+  position: fixed; inset: 0;
+  background: color-mix(in srgb, var(--ink) 20%, transparent);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 99;
+}
+
+.chat-panel {
+  position: fixed;
+  bottom: var(--sp-5);
+  right: var(--sp-5);
+  width: min(420px, calc(100vw - 2 * var(--sp-5)));
+  height: min(580px, calc(100vh - 80px));
+  z-index: 100;
+
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 0.5px color-mix(in srgb, var(--ink) 12%, transparent),
+    0 8px 32px -4px color-mix(in srgb, var(--ink) 22%, transparent),
+    0 32px 80px -16px color-mix(in srgb, var(--ink) 18%, transparent);
+
+  /* Slide-up entrance */
+  transform: translateY(16px) scale(0.98);
+  opacity: 0;
+  transition:
+    transform 0.22s cubic-bezier(0.34, 1.3, 0.64, 1),
+    opacity 0.18s ease;
+  pointer-events: none;
+}
+.chat-panel:not([hidden]) {
+  pointer-events: auto;
+}
+.chat-panel--open {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+/* Header — frosted glass strip, like macOS toolbar */
+.chat-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 0.5px solid var(--line-soft);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 16px 16px 0 0;
+  flex-shrink: 0;
+}
+.chat-title {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--t-small); font-weight: 700; color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.chat-close {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: none; border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink-2); cursor: pointer;
+  transition: background 0.1s ease;
+}
+.chat-close:hover {
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+  color: var(--ink);
+}
+
+/* Data provenance note */
+.chat-hint {
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--t-micro); color: var(--ink-3);
+  background: color-mix(in srgb, var(--accent-fill) 6%, transparent);
+  border-bottom: 0.5px solid var(--line-soft);
+  flex-shrink: 0;
+}
+
+/* Message list — scroll within, no bar if narrow */
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-4);
+  display: flex; flex-direction: column; gap: var(--sp-3);
+  scroll-behavior: smooth;
+}
+
+/* Bubbles — iMessage layout */
+.chat-msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 85%;
+}
+.chat-msg.user   { align-self: flex-end; align-items: flex-end; }
+.chat-msg.assistant { align-self: flex-start; align-items: flex-start; }
+
+.chat-bubble {
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: 16px;
+  font-size: var(--t-small); line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.chat-msg.user .chat-bubble {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  border-bottom-right-radius: 4px;
+}
+.chat-msg.assistant .chat-bubble {
+  background: var(--surface-2);
+  color: var(--ink);
+  border-bottom-left-radius: 4px;
+}
+.chat-bubble--error {
+  background: color-mix(in srgb, var(--sev-critical) 10%, var(--surface-2));
+  color: var(--sev-critical);
+  border: 1px solid color-mix(in srgb, var(--sev-critical) 20%, transparent);
+}
+
+/* Typing indicator — three bouncing dots */
+.chat-bubble--typing {
+  display: flex; gap: 5px; align-items: center;
+  padding: var(--sp-2) var(--sp-3);
+  min-width: 52px;
+}
+.chat-bubble--typing span {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--ink-3);
+  animation: chat-bounce 1.2s ease-in-out infinite;
+}
+.chat-bubble--typing span:nth-child(2) { animation-delay: 0.18s; }
+.chat-bubble--typing span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes chat-bounce {
+  0%, 80%, 100% { transform: translateY(0);    opacity: 0.5; }
+  40%           { transform: translateY(-5px); opacity: 1;   }
+}
+
+/* Input row */
+.chat-form {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 0.5px solid var(--line-soft);
+  flex-shrink: 0;
+  background: var(--surface);
+  border-radius: 0 0 16px 16px;
+}
+.chat-input {
+  flex: 1;
+  height: 38px !important;
+  border-radius: 10px !important;
+  font-size: var(--t-small) !important;
+  padding: 0 var(--sp-3) !important;
+  background: var(--surface-2) !important;
+  border: 0.5px solid var(--line) !important;
+}
+.chat-send {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; flex-shrink: 0;
+  border: none; border-radius: 50%;
+  background: var(--accent-fill); color: var(--on-accent);
+  cursor: pointer;
+  transition: filter 0.1s ease;
+}
+.chat-send:hover  { filter: brightness(1.1); }
+.chat-send:active { filter: brightness(0.9); }
+.chat-send[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+/* Reduced motion — collapse all transitions */
+@media (prefers-reduced-motion: reduce) {
+  .chat-panel {
+    transition: opacity 0.001ms !important;
+    transform: none !important;
+  }
+  .chat-bubble--typing span { animation: none !important; opacity: 0.5; }
+}
