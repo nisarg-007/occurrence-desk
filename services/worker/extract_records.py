@@ -11,9 +11,9 @@ Run from the repo root:
 """
 
 import json
+import os
 
 from jsonschema import Draft202012Validator
-
 from parser import parse_pdf
 
 PDF_PATH = "services/worker/sample_pdfs/nmac.pdf"
@@ -41,8 +41,6 @@ if errors_found:
 else:
     print("All 50 records match contracts/extraction-record.schema.json.")
 
-import os
-
 os.makedirs("services/worker/output", exist_ok=True)
 with open(OUTPUT_PATH, "w") as f:
     json.dump(records, f, indent=2)
@@ -50,6 +48,8 @@ print(f"\nSaved to {OUTPUT_PATH}")
 
 # print one full record so it's easy to eyeball against the original PDF
 sample = records[0]
-print(f"\n--- Full example: ACN {sample['acn']} (pages {sample['page_from']}-{sample['page_to']}) ---")
+print(
+    f"\n--- Full example: ACN {sample['acn']} (pages {sample['page_from']}-{sample['page_to']}) ---"
+)
 print(json.dumps(sample, indent=2)[:3000])
 print("... (truncated)")

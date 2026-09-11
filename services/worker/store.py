@@ -48,9 +48,7 @@ def reset() -> None:
 
 
 def register_document(document_id: int, sha256: str, s3_bucket: str, s3_key: str) -> None:
-    backend().register_document(
-        document_id, sha256=sha256, s3_bucket=s3_bucket, s3_key=s3_key
-    )
+    backend().register_document(document_id, sha256=sha256, s3_bucket=s3_bucket, s3_key=s3_key)
 
 
 def claim_for_parsing(document_id: int) -> bool:

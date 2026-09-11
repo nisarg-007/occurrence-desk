@@ -38,7 +38,16 @@ import pdfplumber
 ACN_LINE = re.compile(r"^ACN:\s*(\d+)$")
 COUNTER_LINE = re.compile(r"^\(\d+\s+of\s+\d+\)$")
 
-BARE_SECTIONS = {"Time / Day", "Place", "Environment", "Aircraft", "Component", "Person", "Events", "Assessments"}
+BARE_SECTIONS = {
+    "Time / Day",
+    "Place",
+    "Environment",
+    "Aircraft",
+    "Component",
+    "Person",
+    "Events",
+    "Assessments",
+}
 NUMBERED_SECTION_RE = re.compile(r"^(Aircraft|Component|Person)\s*:\s*(\d+)$")
 NARRATIVE_RE = re.compile(r"^Narrative:\s*(\d+)$")
 SYNOPSIS_LINE = "Synopsis"
@@ -97,13 +106,13 @@ def _parse_one_record(lines, acn, document_id, page_from, page_to):
     """lines: the (page_number, top, text) triples belonging to one record,
     ACN line included. Returns a dict shaped like extraction-record.schema.json."""
 
-    coded = {}          # {section_key: {label: value_or_[values]}}
-    flat_fields = []     # [{"path": ..., "value": ...}]
+    coded = {}  # {section_key: {label: value_or_[values]}}
+    flat_fields = []  # [{"path": ..., "value": ...}]
     narrative_parts = []
     synopsis_parts = []
 
-    section = None       # current section key, e.g. "Place" or "Aircraft : 2"
-    mode = None          # None | "narrative" | "synopsis"
+    section = None  # current section key, e.g. "Place" or "Aircraft : 2"
+    mode = None  # None | "narrative" | "synopsis"
 
     def add_field(label, value):
         flat_fields.append({"path": f"{section}.{label}", "value": value})
@@ -169,7 +178,9 @@ def _parse_one_record(lines, acn, document_id, page_from, page_to):
         m = ANOMALY_AXIS_RE.match(f["path"])
         if m:
             axes.add(m.group(1))
-    hazards = [{"code": hazard_code(axis), "confidence": 1.0, "source": "nasa"} for axis in sorted(axes)]
+    hazards = [
+        {"code": hazard_code(axis), "confidence": 1.0, "source": "nasa"} for axis in sorted(axes)
+    ]
 
     return {
         "acn": acn,

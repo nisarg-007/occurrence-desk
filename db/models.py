@@ -34,6 +34,13 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import CITEXT, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+#: `ingest_events.event` values. Two lanes write and read these strings - the worker
+#: writes them, `SqlRepo.parsed_in_last_60s` counts them - so they live in one place.
+#: They were inline literals in both files and did not match, which made the API's
+#: throughput_per_min read 0 no matter how much the worker parsed.
+EVENT_DOCUMENT_PARSED = "document.parsed"
+EVENT_REPORT_EXTRACTED = "report.extracted"
+
 
 class Base(DeclarativeBase):
     pass

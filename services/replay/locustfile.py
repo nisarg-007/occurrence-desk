@@ -11,10 +11,12 @@ Usage:
     locust -f services/replay/locustfile.py --host http://127.0.0.1:8000
 Then open http://localhost:8089 to configure users and start the test.
 """
+
 import hashlib
 import random
 import string
-from locust import HttpUser, task, between
+
+from locust import HttpUser, between, task
 
 
 class AnalystUser(HttpUser):

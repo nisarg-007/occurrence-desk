@@ -36,7 +36,8 @@ GOLD_DIR = "eval/gold"
 def load_gold():
     records = []
     for path in sorted(glob.glob(f"{GOLD_DIR}/*.json")):
-        records.append(json.load(open(path)))
+        with open(path) as handle:
+            records.append(json.load(handle))
     return records
 
 
@@ -88,8 +89,10 @@ def main():
         total_pred += len(pred_pairs)
         total_correct += correct
 
-        print(f"ACN {gold['acn']} ({gold['pdf']}): P={precision:.3f} R={recall:.3f} F1={f1:.3f} "
-              f"(gold={len(gold_pairs)} pairs, predicted={len(pred_pairs)} pairs)")
+        print(
+            f"ACN {gold['acn']} ({gold['pdf']}): P={precision:.3f} R={recall:.3f} F1={f1:.3f} "
+            f"(gold={len(gold_pairs)} pairs, predicted={len(pred_pairs)} pairs)"
+        )
         if missing:
             print(f"  MISSING ({len(missing)}): {missing[:5]}{' ...' if len(missing) > 5 else ''}")
         if extra:
@@ -97,10 +100,14 @@ def main():
 
     overall_p = total_correct / total_pred if total_pred else 0.0
     overall_r = total_correct / total_gold if total_gold else 0.0
-    overall_f1 = 2 * overall_p * overall_r / (overall_p + overall_r) if (overall_p + overall_r) else 0.0
+    overall_f1 = (
+        2 * overall_p * overall_r / (overall_p + overall_r) if (overall_p + overall_r) else 0.0
+    )
 
-    print(f"\nextraction  P {overall_p:.3f}  R {overall_r:.3f}  F1 {overall_f1:.3f}  "
-          f"(n={len(rows)} records, {total_gold} gold field pairs)")
+    print(
+        f"\nextraction  P {overall_p:.3f}  R {overall_r:.3f}  F1 {overall_f1:.3f}  "
+        f"(n={len(rows)} records, {total_gold} gold field pairs)"
+    )
     print(f"\nNOTE: {len(rows)} hand-verified records, not the full 50 the work-pack specifies.")
 
 

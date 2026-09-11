@@ -21,8 +21,8 @@ import os
 
 import pytest
 
-from services.worker.parser import hazard_code, parse_pdf
 from services.worker.parser import _parse_one_record as parse_one_record
+from services.worker.parser import hazard_code, parse_pdf
 
 NMAC_PDF = "services/worker/sample_pdfs/nmac.pdf"
 
@@ -54,7 +54,10 @@ def test_bare_person_section_does_not_leak_into_aircraft():
             "Synopsis",
             "test synopsis",
         ),
-        acn="1000001", document_id=1, page_from=1, page_to=1,
+        acn="1000001",
+        document_id=1,
+        page_from=1,
+        page_to=1,
     )
     assert record["coded"]["Aircraft : 2"] == {"Reference": "Y"}
     assert record["coded"]["Person"] == {
@@ -78,7 +81,10 @@ def test_bare_aircraft_section_does_not_leak_into_place():
             "Synopsis",
             "test synopsis",
         ),
-        acn="1000002", document_id=1, page_from=1, page_to=1,
+        acn="1000002",
+        document_id=1,
+        page_from=1,
+        page_to=1,
     )
     assert record["coded"]["Place"] == {"State Reference": "VA"}
     assert record["coded"]["Aircraft"] == {
@@ -100,7 +106,10 @@ def test_repeated_label_in_one_section_becomes_a_list():
             "Synopsis",
             "y",
         ),
-        acn="1000003", document_id=1, page_from=1, page_to=1,
+        acn="1000003",
+        document_id=1,
+        page_from=1,
+        page_to=1,
     )
     assert record["coded"]["Person"]["Function.Flight Crew"] == ["Pilot Flying", "Single Pilot"]
     # but `fields` keeps both as separate (path, value) pairs - that's what
@@ -123,7 +132,10 @@ def test_hazards_populated_from_anomaly_fields_deduplicated():
             "Synopsis",
             "y",
         ),
-        acn="1000004", document_id=1, page_from=1, page_to=1,
+        acn="1000004",
+        document_id=1,
+        page_from=1,
+        page_to=1,
     )
     codes = sorted(h["code"] for h in record["hazards"])
     assert codes == ["conflict", "deviation_discrepancy_procedural"]  # deduplicated, not 3 rows
@@ -143,7 +155,10 @@ def test_narrative_and_synopsis_never_mistaken_for_a_new_section():
             "Synopsis",
             "short synopsis",
         ),
-        acn="1000005", document_id=1, page_from=1, page_to=1,
+        acn="1000005",
+        document_id=1,
+        page_from=1,
+        page_to=1,
     )
     assert record["narrative"] == "ATC cleared us direct."
     assert record["synopsis"] == "short synopsis"

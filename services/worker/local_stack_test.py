@@ -21,6 +21,7 @@ Run from the repo root:
     python services/worker/local_stack_test.py
 """
 
+import contextlib
 import datetime as dt
 import hashlib
 import json
@@ -43,10 +44,9 @@ BUCKET = "occdesk-test-docs"
 def bootstrap():
     """Create the bucket + main queue + DLQ if they don't already exist."""
     s3_client = s3()
-    try:
+    # already exists is fine: this script is meant to be re-runnable
+    with contextlib.suppress(Exception):
         s3_client.create_bucket(Bucket=BUCKET)
-    except Exception:
-        pass  # already exists - fine, this is meant to be re-runnable
 
     sqs_client = sqs()
     dlq = sqs_client.create_queue(QueueName="occdesk-test-parse-dlq")
@@ -69,7 +69,8 @@ def bootstrap():
 
 
 def upload_and_enqueue(queue_url: str, local_path: str, document_id: int) -> str:
-    data = open(local_path, "rb").read()
+    with open(local_path, "rb") as handle:
+        data = handle.read()
     sha256 = hashlib.sha256(data).hexdigest()
     today = dt.date.today()
     s3_key = f"raw/{today:%Y/%m/%d}/{sha256}.pdf"
@@ -138,6 +139,7 @@ def main():
 
     print("Waiting 6s for the visibility timeout to expire, then letting the worker try again...")
     import time
+
     time.sleep(6)
     processed = worker.run(max_messages=1, queue_url=queue_url)
     print(f"Second delivery attempt: worker processed {processed} message(s)")
@@ -147,7 +149,10 @@ def main():
     # after maxReceiveCount=2 is exceeded, SQS/ElasticMQ moves it to the DLQ
     # on the next receive rather than handing it to us again
     resp = sqs().receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1, WaitTimeSeconds=1)
-    print(f"Main queue receive after redrive: {'a message' if resp.get('Messages') else 'EMPTY - moved on'}")
+    print(
+        "Main queue receive after redrive: "
+        f"{'a message' if resp.get('Messages') else 'EMPTY - moved on'}"
+    )
     dlq_resp = sqs().receive_message(QueueUrl=dlq_url, MaxNumberOfMessages=1, WaitTimeSeconds=1)
     print(f"DLQ receive: {'FOUND the poison message' if dlq_resp.get('Messages') else 'not found'}")
 

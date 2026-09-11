@@ -16,6 +16,7 @@ from services.api.repo import InMemoryRepo, Repository
 from services.api.security import AuthError, Principal, decode_token
 from services.common.settings import Settings, get_settings
 
+
 def _default_repo() -> Repository:
     """Parva's `SqlRepo` when a database is configured, the in-memory stub when not.
 

@@ -116,6 +116,16 @@ def mark_parsed(document_id: int) -> None:
             .where(models.Document.id == document_id)
             .values(status="parsed", error_text=None)
         )
+        # SqlRepo.parsed_in_last_60s() counts `ingest_events` rows with this exact
+        # event name, and that count is the `throughput_per_min` in GET /queue/stats,
+        # which is the numerator of the drain-time estimate on Sowmya's dashboard.
+        # Nothing wrote the row, so throughput read 0 forever and drain ETA would
+        # have divided by epsilon. Named here so the two lanes agree on the string.
+        session.execute(
+            insert(models.IngestEvent).values(
+                document_id=document_id, event=models.EVENT_DOCUMENT_PARSED
+            )
+        )
 
 
 def mark_failed(document_id: int, error_text: str) -> None:
@@ -147,7 +157,9 @@ def _hazard_category_ids(session) -> dict[str, int]:
     return dict(session.execute(select(models.HazardCategory.code, models.HazardCategory.id)).all())
 
 
-def _write_hazards(session, report_id: int, hazards: list[dict], categories: dict[str, int]) -> None:
+def _write_hazards(
+    session, report_id: int, hazards: list[dict], categories: dict[str, int]
+) -> None:
     """One row per (report, category, source). Highest confidence wins when the
     same category arrives twice from the same source - which happens whenever
     two distinct NASA axes fold into `other`."""
@@ -163,7 +175,9 @@ def _write_hazards(session, report_id: int, hazards: list[dict], categories: dic
             )
             continue
         if code not in categories:
-            logger.info("hazard code %r not in taxonomy - folded into %r", code, FALLBACK_HAZARD_CODE)
+            logger.info(
+                "hazard code %r not in taxonomy - folded into %r", code, FALLBACK_HAZARD_CODE
+            )
         key = (category_id, hazard["source"])
         best[key] = max(best.get(key, 0.0), float(hazard["confidence"]))
 
@@ -225,7 +239,7 @@ def save_reports(document_id: int, extracted_records: list[dict]) -> int:
             session.execute(
                 insert(models.IngestEvent).values(
                     document_id=document_id,
-                    event="report.extracted",
+                    event=models.EVENT_REPORT_EXTRACTED,
                     detail={"acn": record["acn"], "report_id": report_id},
                 )
             )

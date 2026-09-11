@@ -51,11 +51,13 @@ def predict_hazards(narrative: str) -> list[dict]:
     proba = model["classifier"].predict_proba(X)[0]  # one row, len == len(labels)
 
     hazards = []
-    for label, confidence in zip(model["labels"], proba):
+    for label, confidence in zip(model["labels"], proba, strict=False):
         if confidence >= CONFIDENCE_THRESHOLD:
-            hazards.append({
-                "code": hazard_code(label),
-                "confidence": round(float(confidence), 3),
-                "source": "model",
-            })
+            hazards.append(
+                {
+                    "code": hazard_code(label),
+                    "confidence": round(float(confidence), 3),
+                    "source": "model",
+                }
+            )
     return hazards

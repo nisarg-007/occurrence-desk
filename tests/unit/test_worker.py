@@ -38,28 +38,36 @@ def isolated_state(tmp_path, monkeypatch):
 def fake_infra(monkeypatch):
     fake = FakeSQS()
     monkeypatch.setattr(worker, "sqs", lambda: fake)
-    monkeypatch.setattr(worker, "s3", lambda: type("S3", (), {"download_file": staticmethod(lambda *a: None)})())
+    monkeypatch.setattr(
+        worker, "s3", lambda: type("S3", (), {"download_file": staticmethod(lambda *a: None)})()
+    )
     monkeypatch.setattr(worker, "predict_hazards", lambda narrative: [])
     return fake
 
 
 def _message(document_id: int, receipt: str = "r1") -> dict:
     return {
-        "Body": json.dumps({
-            "document_id": document_id,
-            "s3_bucket": "b",
-            "s3_key": "k.pdf",
-            "trace_id": "test-trace",
-        }),
+        "Body": json.dumps(
+            {
+                "document_id": document_id,
+                "s3_bucket": "b",
+                "s3_key": "k.pdf",
+                "trace_id": "test-trace",
+            }
+        ),
         "ReceiptHandle": receipt,
     }
 
 
 def test_happy_path_saves_reports_marks_parsed_and_deletes_message(monkeypatch, fake_infra):
     store.register_document(1, sha256="a" * 64, s3_bucket="b", s3_key="k.pdf")
-    monkeypatch.setattr(worker, "parse_pdf", lambda path, document_id: [
-        {"acn": "111", "narrative": "n", "hazards": []},
-    ])
+    monkeypatch.setattr(
+        worker,
+        "parse_pdf",
+        lambda path, document_id: [
+            {"acn": "111", "narrative": "n", "hazards": []},
+        ],
+    )
 
     worker.handle_message(_message(1), QUEUE_URL)
 
@@ -84,13 +92,19 @@ def test_parse_failure_marks_failed_and_does_not_delete_message(monkeypatch, fak
     assert fake_infra.deleted == []  # message must survive for SQS to redeliver it
 
 
-def test_duplicate_message_for_already_parsed_document_is_dropped_without_reparsing(monkeypatch, fake_infra):
+def test_duplicate_message_for_already_parsed_document_is_dropped_without_reparsing(
+    monkeypatch, fake_infra
+):
     store.register_document(3, sha256="c" * 64, s3_bucket="b", s3_key="k.pdf")
     calls = []
-    monkeypatch.setattr(worker, "parse_pdf", lambda path, document_id: (
-        calls.append(1),
-        [{"acn": "333", "narrative": "n", "hazards": []}],
-    )[1])
+    monkeypatch.setattr(
+        worker,
+        "parse_pdf",
+        lambda path, document_id: (
+            calls.append(1),
+            [{"acn": "333", "narrative": "n", "hazards": []}],
+        )[1],
+    )
 
     worker.handle_message(_message(3, receipt="r1"), QUEUE_URL)
     worker.handle_message(_message(3, receipt="r2"), QUEUE_URL)  # redelivered duplicate

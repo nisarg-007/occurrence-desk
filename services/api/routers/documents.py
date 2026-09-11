@@ -151,7 +151,7 @@ def _summary(repo: Repository, r) -> ReportSummary:
         acn=r.acn,
         report_date=r.report_date,
         synopsis=r.synopsis,
-        priority=repo.priority(r) if hasattr(repo, "priority") else 0,
+        priority=repo.priority(r),
         state=r.state,
         assigned_to=r.assigned_to,
         hazards=[Hazard(**h) for h in r.hazards],

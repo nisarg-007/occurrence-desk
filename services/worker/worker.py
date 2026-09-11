@@ -51,7 +51,9 @@ class VisibilityHeartbeat:
     parse is still running, so a slow parse doesn't cause SQS to redeliver
     the message to a second worker before we're done with it."""
 
-    def __init__(self, queue_url: str, receipt_handle: str, timeout: int = VISIBILITY_TIMEOUT_SECONDS):
+    def __init__(
+        self, queue_url: str, receipt_handle: str, timeout: int = VISIBILITY_TIMEOUT_SECONDS
+    ):
         self._queue_url = queue_url
         self._receipt_handle = receipt_handle
         self._timeout = timeout
@@ -87,9 +89,12 @@ def handle_message(message: dict, queue_url: str) -> None:
     document_id = body["document_id"]
 
     if not store.claim_for_parsing(document_id):
-        logger.info("document already claimed/parsed - dropping duplicate", extra={
-            "document_id": document_id,
-        })
+        logger.info(
+            "document already claimed/parsed - dropping duplicate",
+            extra={
+                "document_id": document_id,
+            },
+        )
         sqs().delete_message(QueueUrl=queue_url, ReceiptHandle=message["ReceiptHandle"])
         return
 
@@ -111,12 +116,15 @@ def handle_message(message: dict, queue_url: str) -> None:
         store.mark_parsed(document_id)
         success = True
         duration_ms = int((time.monotonic() - started) * 1000)
-        logger.info("document parsed", extra={
-            "document_id": document_id,
-            "records_extracted": len(records),
-            "records_new": inserted,
-            "duration_ms": duration_ms,
-        })
+        logger.info(
+            "document parsed",
+            extra={
+                "document_id": document_id,
+                "records_extracted": len(records),
+                "records_new": inserted,
+                "duration_ms": duration_ms,
+            },
+        )
     except Exception as exc:
         logger.exception("parse failed", extra={"document_id": document_id})
         store.mark_failed(document_id, f"{type(exc).__name__}: {exc}")

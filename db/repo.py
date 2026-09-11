@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from db import models
 from db.priority import refresh_priorities
+from services.api import ranking
 from services.api.pagination import Cursor
 from services.api.repo import DocumentRow, ReportRow, UserRow
 
@@ -276,8 +277,33 @@ class SqlRepo:
                 select(func.count())
                 .select_from(models.IngestEvent)
                 .where(
-                    models.IngestEvent.event == "document.parsed",
+                    models.IngestEvent.event == models.EVENT_DOCUMENT_PARSED,
                     models.IngestEvent.at >= cutoff,
                 )
             )
             return count or 0
+
+    def priority(self, r: ReportRow, today: dt.date | None = None) -> int:
+        """The same score `InMemoryRepo.priority` returns, from the same function.
+
+        Computed from `ranking.py` rather than read from `reports.priority`, on
+        purpose: the column is a denormalised copy that `priority.py` refreshes
+        on write, so recency has drifted by however long it is since the last
+        refresh. Reading the column would make the worklist and `/why` disagree.
+        The column stays for keyset ordering; this is the number shown.
+
+        SqlRepo omitted this method entirely, and `_summary` masked it with
+        `hasattr(repo, "priority") else 0` - so every report in the API's
+        worklist read priority 0 while `/why` on the same report read 41.
+        Found by querying the live API, not by a test: both repositories
+        satisfied the Protocol, because the Protocol did not name the method.
+        """
+        return ranking.priority(
+            ranking.ScoreInput(
+                severity_weights=r.severity_weights,
+                best_link_confidence=r.best_link_confidence,
+                report_date=r.report_date,
+                manager_flagged=r.manager_flagged,
+            ),
+            today or dt.date.today(),
+        )

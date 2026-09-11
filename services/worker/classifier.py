@@ -38,9 +38,8 @@ import sys
 from collections import Counter
 
 sys.path.insert(0, "services/worker")
-from parser import parse_pdf  # noqa: E402
-
 import joblib
+from parser import parse_pdf  # noqa: E402
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import classification_report, f1_score, precision_recall_fscore_support
@@ -57,6 +56,7 @@ def make_classifier():
     # margin, which isn't the "confidence" number the extraction-record
     # contract asks for. Still LinearSVC underneath, per the work-pack.
     return OneVsRestClassifier(CalibratedClassifierCV(LinearSVC(), cv=3))
+
 
 ANOMALY_RE = re.compile(r"^Events\.Anomaly\.(.+)$")
 MIN_LABEL_COUNT = 30
@@ -107,8 +107,10 @@ def main():
     print(f"Total records: {len(all_records)}")
 
     kept, dropped, counts = build_label_set(all_records)
-    print(f"\nKept {len(kept)} labels (>= {MIN_LABEL_COUNT} examples), "
-          f"{len(dropped)} rare axes folded into '{OTHER}': {dropped}")
+    print(
+        f"\nKept {len(kept)} labels (>= {MIN_LABEL_COUNT} examples), "
+        f"{len(dropped)} rare axes folded into '{OTHER}': {dropped}"
+    )
 
     os.makedirs("eval", exist_ok=True)
     with open("eval/labels.json", "w") as f:
@@ -120,6 +122,7 @@ def main():
 
     set_names = sorted({s for s, _ in all_records})
     from sklearn.model_selection import train_test_split
+
     train_sets, test_sets = train_test_split(set_names, test_size=0.2, random_state=42)
     train_sets, test_sets = set(train_sets), set(test_sets)
     print(f"\nSplit by report set: {len(train_sets)} train sets, {len(test_sets)} test sets")
@@ -144,7 +147,10 @@ def main():
 
     micro = f1_score(y_test, y_pred, average="micro", zero_division=0)
     macro = f1_score(y_test, y_pred, average="macro", zero_division=0)
-    print(f"\ncategorisation micro-F1 {micro:.3f}  macro-F1 {macro:.3f}  (n={len(test)} held-out records)")
+    print(
+        f"\ncategorisation micro-F1 {micro:.3f}  macro-F1 {macro:.3f}  "
+        f"(n={len(test)} held-out records)"
+    )
 
     precision, recall, f1, support = precision_recall_fscore_support(
         y_test, y_pred, average=None, zero_division=0
@@ -152,37 +158,46 @@ def main():
 
     report_lines = []
     report_lines.append("# Hazard categorisation - held-out accuracy\n")
-    report_lines.append(f"Trained on {len(train)} records ({len(train_sets)} report sets), "
-                         f"evaluated on {len(test)} held-out records ({len(test_sets)} report sets held out entirely).\n")
+    report_lines.append(
+        f"Trained on {len(train)} records ({len(train_sets)} report sets), "
+        f"evaluated on {len(test)} held-out records "
+        f"({len(test_sets)} report sets held out entirely).\n"
+    )
     report_lines.append(f"Held-out report sets: {', '.join(sorted(test_sets))}\n")
     report_lines.append(f"**micro-F1: {micro:.3f}**  **macro-F1: {macro:.3f}**\n")
-    report_lines.append("Micro-F1 counts every prediction equally; macro-F1 weights every label equally "
-                         "regardless of how rare it is - which is why macro is lower: rare categories are "
-                         "genuinely harder and this is not hidden.\n")
+    report_lines.append(
+        "Micro-F1 counts every prediction equally; macro-F1 weights every label equally "
+        "regardless of how rare it is - which is why macro is lower: rare categories are "
+        "genuinely harder and this is not hidden.\n"
+    )
     report_lines.append("\n## Per-label breakdown\n")
     report_lines.append("| Label | Precision | Recall | F1 | Support (test) |")
     report_lines.append("|---|---|---|---|---|")
-    for label, p, r, f, s in zip(all_labels, precision, recall, f1, support):
+    for label, p, r, f, s in zip(all_labels, precision, recall, f1, support, strict=False):
         report_lines.append(f"| {label} | {p:.2f} | {r:.2f} | {f:.2f} | {s} |")
 
     # error analysis: pull genuine misses from the held-out set
     report_lines.append("\n## Error analysis (10 held-out mismatches)\n")
     mismatches = []
     for i, (set_name, rec) in enumerate(test):
-        true = mlb.inverse_transform(y_test[i:i+1])[0]
-        pred = mlb.inverse_transform(y_pred[i:i+1])[0]
+        true = mlb.inverse_transform(y_test[i : i + 1])[0]
+        pred = mlb.inverse_transform(y_pred[i : i + 1])[0]
         if set(true) != set(pred):
             mismatches.append((set_name, rec, true, pred))
 
-    report_lines.append(f"{len(mismatches)} of {len(test)} held-out records did not get an EXACT "
-                         f"label-set match (one label added, dropped, or both counts as a miss here, "
-                         f"even if the rest of that record's labels were right - the per-record "
-                         f"'samples avg' F1 printed by classification_report is the fairer number "
-                         f"for how close a typical prediction actually was).\n")
+    report_lines.append(
+        f"{len(mismatches)} of {len(test)} held-out records did not get an EXACT "
+        f"label-set match (one label added, dropped, or both counts as a miss here, "
+        f"even if the rest of that record's labels were right - the per-record "
+        f"'samples avg' F1 printed by classification_report is the fairer number "
+        f"for how close a typical prediction actually was).\n"
+    )
     for set_name, rec, true, pred in mismatches[:10]:
         snippet = rec["narrative"][:220].replace("\n", " ")
-        report_lines.append(f"- **ACN {rec['acn']}** (set `{set_name}`) - true: {sorted(true)} | "
-                             f"predicted: {sorted(pred)}\n  > {snippet}...\n")
+        report_lines.append(
+            f"- **ACN {rec['acn']}** (set `{set_name}`) - true: {sorted(true)} | "
+            f"predicted: {sorted(pred)}\n  > {snippet}...\n"
+        )
 
     with open("eval/report.md", "w") as f:
         f.write("\n".join(report_lines))
@@ -204,13 +219,16 @@ def main():
     final_clf.fit(X_all, y_all)
 
     os.makedirs("services/worker/model", exist_ok=True)
-    joblib.dump({
-        "vectorizer": final_vectorizer,
-        "classifier": final_clf,
-        "labels": all_labels,
-        "held_out_micro_f1": micro,
-        "held_out_macro_f1": macro,
-    }, MODEL_PATH)
+    joblib.dump(
+        {
+            "vectorizer": final_vectorizer,
+            "classifier": final_clf,
+            "labels": all_labels,
+            "held_out_micro_f1": micro,
+            "held_out_macro_f1": macro,
+        },
+        MODEL_PATH,
+    )
     print(f"Saved {MODEL_PATH}")
 
 

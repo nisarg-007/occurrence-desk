@@ -72,7 +72,12 @@ def refresh_priorities(session: Session, *, report_id: int | None = None) -> int
     recency drift stays bounded for untouched reports.
     """
     if report_id is not None:
-        sql = _REFRESH_ALL_SQL.format(report_filter="AND r2.id = :report_id")
+        # `r`, not `r2`: the UPDATE aliases `reports` as `r`. The original
+        # `AND r2.id = :report_id` referenced an alias that does not exist, so
+        # every single-report refresh raised UndefinedTable. It survived review
+        # because this module was only ever compiled and logic-cross-checked -
+        # never executed against a live Postgres until the merge on `try-main`.
+        sql = _REFRESH_ALL_SQL.format(report_filter="AND r.id = :report_id")
         result = session.execute(text(sql), {"report_id": report_id})
     else:
         sql = _REFRESH_ALL_SQL.format(report_filter="")
