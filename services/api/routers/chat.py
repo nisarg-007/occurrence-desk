@@ -26,8 +26,8 @@ from services.common.settings import get_settings
 
 router = APIRouter(tags=["chat"])
 
-_GROK_URL = "https://api.x.ai/v1/chat/completions"
-_MODEL = "grok-3-mini"  # xAI's efficient model; swap to grok-3 for deeper reasoning
+_GROK_URL = "https://api.groq.com/openai/v1/chat/completions"
+_MODEL = "groq/compound"  # Groq's compound model — confirmed available on this account
 
 SYSTEM_PROMPT = """\
 You are an aviation safety analyst assistant embedded in Occurrence Desk, an \
@@ -139,12 +139,12 @@ async def chat(
         )
 
     if resp.status_code == 401:
-        raise ApiProblem(502, "Grok API auth failed", "Check your GROK_API_KEY.")
+        raise ApiProblem(502, "Groq API auth failed", "Check your AI_CHAT_KEY — it must be a valid Groq API key (gsk_…).")
     if resp.status_code == 429:
-        raise ApiProblem(429, "Grok rate limit reached", "Please wait a moment and try again.")
+        raise ApiProblem(429, "Groq rate limit reached", "Please wait a moment and try again.")
     if resp.status_code >= 400:
         raise ApiProblem(
-            502, "Grok API error", f"Upstream returned {resp.status_code}."
+            502, "Groq API error", f"Upstream returned {resp.status_code}."
         )
 
     data = resp.json()
