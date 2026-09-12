@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import csv
 import datetime as dt
+import io
+from collections.abc import Iterator
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import StreamingResponse
 
-from services.api import problems, ranking
+from services.api import presentation, problems, ranking
 from services.api.deps import analyst, get_repo, manager
 from services.api.pagination import Cursor, InvalidCursor
 from services.api.repo import Repository
@@ -71,6 +75,97 @@ def list_reports(
         else None
     )
     return ReportPage(items=items, next_cursor=next_cursor, page_size=page_size)
+
+
+_EXPORT_HEADER = (
+    "acn",
+    "priority",
+    "priority_band",
+    "hazard_categories",
+    "state",
+    "report_date",
+    "synopsis",
+    "assigned_analyst_id",
+)
+#: Reports fetched per internal page while streaming. Keyset paged, same as the worklist -
+#: never OFFSET, so a large export does not fall over on a big result set.
+_EXPORT_PAGE_SIZE = 200
+
+
+def _export_rows(
+    repo: Repository,
+    *,
+    category: str | None,
+    state: str | None,
+    priority_min: int | None,
+    q: str | None,
+) -> Iterator[str]:
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(_EXPORT_HEADER)
+    yield buf.getvalue()
+
+    cursor: Cursor | None = None
+    while True:
+        buf.seek(0)
+        buf.truncate(0)
+        rows = repo.list_reports(
+            cursor=cursor,
+            page_size=_EXPORT_PAGE_SIZE,
+            category=category,
+            state=state,
+            priority_min=priority_min,
+            q=q,
+        )
+        has_more = len(rows) > _EXPORT_PAGE_SIZE
+        rows = rows[:_EXPORT_PAGE_SIZE]
+        for r in rows:
+            priority = repo.priority(r)
+            writer.writerow(
+                [
+                    r.acn,
+                    priority,
+                    presentation.level(priority)[1],
+                    ";".join(h["label"] for h in r.hazards),
+                    r.state,
+                    r.report_date.isoformat() if r.report_date else "",
+                    r.synopsis or "",
+                    r.assigned_to if r.assigned_to is not None else "",
+                ]
+            )
+        yield buf.getvalue()
+        if not has_more or not rows:
+            break
+        last = rows[-1]
+        cursor = Cursor(repo.priority(last), last.report_date, last.id)
+
+
+@router.get("/export")
+def export_reports(
+    category: str | None = None,
+    state: str | None = None,
+    priority_min: int | None = Query(default=None, ge=0, le=100),
+    flight_date: dt.date | None = None,
+    q: str | None = None,
+    format: str = Query(default="csv", pattern="^csv$"),
+    p: Principal = Depends(analyst),
+    repo: Repository = Depends(get_repo),
+) -> StreamingResponse:
+    """Compliance export: the same filtered, ranked worklist `GET /reports` returns, as a
+    downloadable CSV - for handing a safety review board or auditor a file instead of
+    screen-scraping the console.
+
+    Same filter parameters as `GET /reports` (`flight_date` is accepted for the same reason
+    it is accepted, unused, there - see that route: it is not yet threaded through
+    `Repository.list_reports`). `format` only ever accepts `csv` today; PDF export was
+    scoped out rather than adding a new dependency for a stretch goal.
+    """
+    _ = flight_date, format  # accepted, not applied - see docstring
+    return StreamingResponse(
+        _export_rows(repo, category=category, state=state, priority_min=priority_min, q=q),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=occurrence-desk-reports.csv"},
+    )
 
 
 @router.get("/{report_id}", response_model=ReportDetail)

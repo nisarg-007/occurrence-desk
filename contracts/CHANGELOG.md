@@ -7,6 +7,21 @@ The format is `YYYY-MM-DD - what changed - why - signed off by`.
 
 ## Unreleased
 
+- **2026-09-12** - Documented `POST /chat` (implemented in `feat/ai-chatbot-grok-ui-redesign`,
+  merged via PR #3, but never added to this contract - caught by
+  `test_every_implemented_operation_is_documented` failing on `main`). Request/response schemas
+  added as `ChatRequest`/`ChatResponse`, matching `services/api/routers/chat.py` exactly. No
+  behaviour change, contract catching up to what was already shipped. - Nisarg
+
+- **2026-09-12** - New `GET /reports/export`. Same filter parameters as `GET /reports`
+  (`category`, `state`, `priority_min`, `flight_date`, `q`), analyst-role, streamed as CSV
+  instead of a JSON page. Added because there was no way to hand the worklist to a safety
+  review board or auditor short of screen-scraping the console - a gap found by reading every
+  route in `services/api/routers/`, not by a feature request. `flight_date` is accepted for
+  parity with `GET /reports` but is not applied, matching that route's own existing (not new)
+  behaviour. `format` only accepts `csv` today; PDF export was scoped out to avoid a new
+  dependency for a stretch goal. - Nisarg
+
 - **2026-09-09** - `QueueStats.workers` description corrected, no type change. It said
   "ECS RunningTaskCount" unqualified, which is what the field will mean once Sowmya's
   CloudWatch/ContainerInsights plumbing lands, but the implementation right now derives it

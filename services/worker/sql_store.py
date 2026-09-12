@@ -35,6 +35,8 @@ from sqlalchemy.dialects.postgresql import insert
 from db import models
 from db.database import session_scope
 from db.priority import refresh_priorities
+from services.api import alerts
+from services.common.settings import get_settings
 
 logger = logging.getLogger("worker.store")
 
@@ -204,7 +206,7 @@ def save_reports(document_id: int, extracted_records: list[dict]) -> int:
     if not extracted_records:
         return 0
 
-    inserted_ids: list[int] = []
+    inserted: list[tuple[int, dict]] = []
     with session_scope() as session:
         categories = _hazard_category_ids(session)
         for record in extracted_records:
@@ -243,16 +245,35 @@ def save_reports(document_id: int, extracted_records: list[dict]) -> int:
                     detail={"acn": record["acn"], "report_id": report_id},
                 )
             )
-            inserted_ids.append(report_id)
+            inserted.append((report_id, record))
 
     # reports.priority is denormalised (see db/priority.py) and the hazard rows
     # that feed it only exist now - so score the new rows after they are
     # committed. This closes one of the two gaps db/README.md named as open.
-    for report_id in inserted_ids:
+    #
+    # This is also the one place a report transitions into a scored state, so it's the
+    # natural spot to check whether that score just crossed into "needs attention"
+    # territory and, if so, fire a webhook alert (services/api/alerts.py) - never
+    # re-fired for the same acn, since this loop only runs for report ids just inserted
+    # for the first time (see alerts.py's own docstring on that idempotency argument).
+    settings = get_settings()
+    for report_id, record in inserted:
         with session_scope() as session:
             refresh_priorities(session, report_id=report_id)
+            priority = session.scalar(
+                select(models.Report.priority).where(models.Report.id == report_id)
+            )
+        if priority is not None:
+            hazards = record.get("hazards") or []
+            alerts.maybe_alert(
+                report_id=report_id,
+                acn=record["acn"],
+                priority=priority,
+                hazard_label=hazards[0]["label"] if hazards else None,
+                settings=settings,
+            )
 
-    return len(inserted_ids)
+    return len(inserted)
 
 
 def report_count() -> int:
