@@ -40,7 +40,7 @@ def check(kind):
         client("s3").list_buckets()
         client("sqs").list_queues()
     if kind == "api":
-        with urllib.request.urlopen("http://127.0.0.1:8000/api/v1/healthz", timeout=3) as response:
+        with urllib.request.urlopen("http://127.0.0.1:8000/healthz", timeout=3) as response:
             if response.status != 200:
                 raise RuntimeError("API health endpoint failed")
     # This heartbeat is touched by the main worker loop, not by a side thread.
