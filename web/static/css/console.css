@@ -160,12 +160,19 @@ a:hover { text-decoration-thickness: 2px; }
 main { padding: var(--sp-5); max-width: 1180px; margin-inline: auto; }
 .stack > * + * { margin-top: var(--sp-4); }
 
+/* HIG layout: give the page's own identity room to breathe before the content
+   groups start — a bigger gap here than between cards in the stack below is what
+   makes "this is the page title" read as a different kind of space than "these
+   are two related panels." 8pt-grid token, not a new magic number. */
 .page-head {
   display: flex; align-items: flex-end; gap: var(--sp-4);
-  flex-wrap: wrap; margin-bottom: var(--sp-4);
+  flex-wrap: wrap; margin-bottom: var(--sp-6);
 }
 .page-head h1 { margin: 0; font-size: var(--t-h1); letter-spacing: -.02em; font-weight: 640; }
-.page-head p  { margin: 0; color: var(--ink-2); font-size: var(--t-small); }
+/* Caption role: secondary to the title in every axis at once (size, weight via
+   the sans stack's regular cut, and colour) so the hierarchy holds even if the
+   page is zoomed — no single dimension is left to carry it alone. */
+.page-head p  { margin: 0; color: var(--ink-2); font-size: var(--t-small); font-weight: 450; }
 
 .card {
   background: var(--surface);
@@ -596,6 +603,26 @@ input[type="password"] {
   width: 100%;
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
+/* Sign-in card: a focused, single-purpose sheet rather than a full-width page —
+   this is the one screen where the content itself is a single small task. */
+.auth-card { max-width: 24rem; margin: var(--sp-7) auto; }
+
+/* One field = one label + one control + one place for its own error, so
+   validation never has to point at a field from a distance. */
+.field { margin: 0 0 var(--sp-4); }
+.field label {
+  display: block; font-size: var(--t-small); font-weight: 550;
+  color: var(--ink); margin-bottom: var(--sp-1);
+}
+.field-error {
+  margin: var(--sp-1) 0 0; font-size: var(--t-micro);
+  color: var(--sev-critical); /* 5.8:1 light / 6.5:1 dark on --surface, documented at top of file */
+}
+.field input[aria-invalid="true"] { border-color: var(--sev-critical); }
+.form-error {
+  margin: var(--sp-3) 0 0; min-height: 1.2em; color: var(--sev-critical);
+}
+
 input[type="text"]:focus,
 input[type="email"]:focus,
 input[type="password"]:focus {
