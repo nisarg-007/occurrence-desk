@@ -3,7 +3,7 @@
 {% block content %}
 <p class="tiny"><a href="/console">← Back to worklist</a></p>
 <div id="report" hx-get="/console/fragments/report/{{ report_id }}" hx-trigger="load"
-     hx-swap="innerHTML" aria-live="polite">
+     hx-swap="innerHTML settle:180ms" aria-live="polite">
   <div class="card"><div class="card-body">
     <span class="skeleton" style="width:35%"></span>
   </div></div>

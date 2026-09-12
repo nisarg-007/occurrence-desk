@@ -349,6 +349,20 @@ dl.fields dd { margin: 0; }
 .htmx-indicator { opacity: 0; transition: opacity .15s; }
 .htmx-request .htmx-indicator { opacity: 1; }
 
+/* Motion > frequent HTMX swaps: the worklist, stats strip, dashboard and report
+   panel all poll or load-and-replace their content. A hard cut on every swap
+   reads as a flicker at 5-10s intervals; a brief cross-fade (htmx's own
+   `settle:` modifier gives new content the .htmx-settling class for exactly the
+   named duration) reads as a refresh instead. Kept short — 120-180ms, under the
+   150-250ms ceiling — because it repeats often and must stay in the background,
+   not draw the eye each time. */
+@media (prefers-reduced-motion: no-preference) {
+  .htmx-settling { opacity: 0; }
+  #stats, #worklist, #dashboard, #report {
+    transition: opacity 180ms ease;
+  }
+}
+
 /* Motion is decorative here. If someone has asked the OS for less of it,
    there is nothing in this UI that needs to move. */
 @media (prefers-reduced-motion: reduce) {
