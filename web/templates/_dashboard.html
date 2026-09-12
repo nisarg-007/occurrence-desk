@@ -22,6 +22,20 @@
     <div class="stat"><div class="k">Unlinked to a flight</div><div class="v">{{ unlinked_pct }}<small>%</small></div></div>
   </div>
 
+  {% if insights %}
+  <section class="card insights" aria-labelledby="insights-h">
+    <div class="card-head">
+      <h2 id="insights-h">Insights</h2>
+      <span class="hint">Read out from the numbers on this page — new here? Start with these.</span>
+    </div>
+    <div class="card-body">
+      <ul class="insight-list">
+        {% for line in insights %}<li><span class="dot" aria-hidden="true"></span>{{ line }}</li>{% endfor %}
+      </ul>
+    </div>
+  </section>
+  {% endif %}
+
   <div class="chart-grid">
     <section class="card">
       <div class="card-head">

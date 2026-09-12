@@ -371,6 +371,34 @@ def dashboard_fragment(
     LATENCY.observe(route=f"{API_PREFIX}/documents/{{document_id}}/complete")
     sample = LATENCY.latest
 
+    # --- insights: plain-language read-outs of numbers already computed above, nothing
+    # newly invented. Skipped entirely when a claim wouldn't be true yet (no reports,
+    # nothing critical) rather than printing a hollow "0 of 0" sentence.
+    insights: list[str] = []
+    if rows:
+        top_hazard = max(hazard_counts.items(), key=lambda kv: kv[1]) if hazard_counts else None
+        if top_hazard:
+            label, n = top_hazard
+            insights.append(
+                f"{label} is the most common hazard — {n} of {len(rows)} reports "
+                f"({round(100 * n / len(rows))}%)."
+            )
+        if band_counts.get("Critical", 0):
+            insights.append(
+                f"{band_counts['Critical']} report"
+                f"{'s' if band_counts['Critical'] != 1 else ''} at Critical priority — "
+                "open the worklist and take the top one first."
+            )
+        busiest_i = max(range(len(counts)), key=lambda i: counts[i]) if any(counts) else None
+        if busiest_i is not None:
+            insights.append(f"{months[busiest_i]} was the busiest month in this window — {counts[busiest_i]} reports filed.")
+        unlinked = round(100 * sum(1 for r in rows if not r.best_link_confidence) / len(rows))
+        if unlinked:
+            insights.append(
+                f"{unlinked}% of reports aren't linked to a flight yet — link confidence "
+                "is 25 of the 100 priority points, so this is depressing scores across the board."
+            )
+
     return TEMPLATES.TemplateResponse(
         request,
         "_dashboard.html",
@@ -398,6 +426,7 @@ def dashboard_fragment(
             "samples": len(LATENCY),
             "bands": bands,
             "hazards": hazards,
+            "insights": insights,
         },
     )
 

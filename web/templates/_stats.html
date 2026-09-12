@@ -17,6 +17,12 @@
 </div>
 <div class="stat">
   <div class="k">Backlog drains in</div>
-  <div class="v">{% if queue.estimating %}<small>Estimating…</small>{% else %}{{ queue.eta_minutes }} <small>min</small>{% endif %}</div>
+  {% if queue.estimating %}
+  <div class="v" title="Needs a live parse queue with real throughput (≥1 document/min) to estimate from. In this environment there's no queue running yet — bring up the compose stack (make up) or upload a document and let a worker parse it, and this fills in on its own. A guessed number would be worse than none here.">
+    <small>Estimating…</small>
+  </div>
+  {% else %}
+  <div class="v">{{ queue.eta_minutes }} <small>min</small></div>
+  {% endif %}
 </div>
 {% endif %}

@@ -429,6 +429,37 @@ dl.fields dd { margin: 0; }
 .stub-banner .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--sev-high);
   flex: none; }
 
+/* Insights: plain-language read-outs of numbers already on the page, aimed at
+   someone new to the tool. Same card chrome as the chart cards below it, so it
+   reads as one more section, not a promoted/different kind of thing. */
+.insights { margin-bottom: var(--sp-4); }
+.insight-list { list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: var(--sp-3); }
+.insight-list li { display: flex; align-items: baseline; gap: var(--sp-3);
+  font-size: var(--t-body); color: var(--ink); }
+.insight-list .dot { width: 6px; height: 6px; border-radius: 999px;
+  background: var(--accent-fill); flex: none; transform: translateY(-3px); }
+
+/* Motion > chart entrance: bars/columns grow in from zero once, on first paint of
+   a chart - not on every 5s dashboard poll (htmx's settle cross-fade above already
+   covers the repeat case). transform-box: fill-box makes the 0% origin sit at the
+   shape's own left edge in SVG rather than the viewport's. Kept to the same
+   150-250ms ceiling as every other motion in this file. */
+@media (prefers-reduced-motion: no-preference) {
+  .chart rect { transform-box: fill-box; transform-origin: left center; animation: bar-grow 260ms ease-out backwards; }
+  .chart rect:nth-of-type(2)  { animation-delay: 20ms; }
+  .chart rect:nth-of-type(3)  { animation-delay: 40ms; }
+  .chart rect:nth-of-type(4)  { animation-delay: 60ms; }
+  .chart rect:nth-of-type(5)  { animation-delay: 80ms; }
+  .chart rect:nth-of-type(6)  { animation-delay: 100ms; }
+  .chart rect:nth-of-type(7)  { animation-delay: 120ms; }
+  .chart rect:nth-of-type(8)  { animation-delay: 140ms; }
+  @keyframes bar-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  .chart .c-line, .chart .c-area, .chart .c-point { animation: chart-in 220ms ease-out backwards; }
+  @keyframes chart-in { from { opacity: 0; } to { opacity: 1; } }
+}
+
 .muted { color: var(--ink-2); }
 .tiny  { font-size: var(--t-micro); color: var(--ink-3); }
 code, kbd { font-family: var(--mono); font-size: .92em;
