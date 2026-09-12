@@ -504,6 +504,17 @@ details.explain[open] summary { color: var(--ink); font-weight: 550; }
     0 8px 24px -8px color-mix(in srgb, var(--ink) 8%, transparent);
   border: none;
 }
+/* Secondary-weight variant: same surface and radius, no shadow — for panels that
+   are glanceable context rather than a focal panel of their own (e.g. the stats
+   strip above the worklist table). Keeps the "one card competes with the next
+   for the eye" problem from happening when several sit in one stack. */
+.card-flat { box-shadow: none; background: var(--surface-2); }
+
+.table-caption {
+  text-align: left; padding: var(--sp-3) var(--sp-4) 0;
+  color: var(--ink-3); font-size: var(--t-micro);
+}
+
 .card > .card-head {
   padding: var(--sp-4) var(--sp-5) var(--sp-3);
 }
