@@ -32,6 +32,7 @@ tags:
   - name: documents
   - name: reports
   - name: queue
+  - name: chat
   - name: ops
 
 security:
@@ -261,6 +262,33 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /chat:
+    post:
+      tags: [chat]
+      summary: Ask the AI assistant a question grounded in live report data
+      description: |
+        Builds a compact snapshot of the current database (counts, priority bands, top hazard
+        categories, the five highest-priority reports) and asks Groq to answer strictly from
+        that context. Returns 503 if no AI_CHAT_KEY is configured, so the endpoint fails loudly
+        rather than producing an ungrounded answer.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChatRequest' }
+      responses:
+        '200':
+          description: Grounded reply
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503':
+          description: AI assistant not configured
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
   /queue/stats:
     get:
       tags: [queue]
@@ -402,6 +430,19 @@ components:
     Role:
       type: string
       enum: [analyst, manager, admin]
+
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string, example: "Which report needs attention first?" }
+
+    ChatResponse:
+      type: object
+      required: [reply, context_rows]
+      properties:
+        reply:        { type: string }
+        context_rows: { type: integer, description: Row count the answer was grounded on }
 
     UploadUrlRequest:
       type: object

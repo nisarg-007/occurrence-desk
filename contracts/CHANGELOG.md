@@ -7,6 +7,12 @@ The format is `YYYY-MM-DD - what changed - why - signed off by`.
 
 ## Unreleased
 
+- **2026-09-12** - Documented `POST /chat` (implemented in `feat/ai-chatbot-grok-ui-redesign`,
+  merged via PR #3, but never added to this contract - caught by
+  `test_every_implemented_operation_is_documented` failing on `main`). Request/response schemas
+  added as `ChatRequest`/`ChatResponse`, matching `services/api/routers/chat.py` exactly. No
+  behaviour change, contract catching up to what was already shipped. - Nisarg
+
 - **2026-09-12** - New `GET /reports/export`. Same filter parameters as `GET /reports`
   (`category`, `state`, `priority_min`, `flight_date`, `q`), analyst-role, streamed as CSV
   instead of a JSON page. Added because there was no way to hand the worklist to a safety
