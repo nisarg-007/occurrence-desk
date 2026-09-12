@@ -43,6 +43,8 @@ class Settings(BaseSettings):
 
     ai_chat_key: str = ""  # xAI / Grok API key — set via GROK_API_KEY env var (never commit a real key)
 
+    webhook_url: str = ""  # Slack incoming-webhook URL for critical-priority alerts (never commit a real one)
+
     @property
     def is_local(self) -> bool:
         return self.app_env == "local"

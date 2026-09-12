@@ -154,6 +154,34 @@ paths:
               schema: { $ref: '#/components/schemas/ReportPage' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /reports/export:
+    get:
+      tags: [reports]
+      summary: The filtered, ranked worklist as a downloadable CSV
+      description: |
+        Compliance export - the same filter parameters as `GET /reports`, streamed as CSV
+        instead of a JSON page, for handing a safety review board or auditor a file instead
+        of screen-scraping the console. Paged internally with the same keyset cursor the
+        worklist itself uses, never `OFFSET`, so a large export does not fall over on a big
+        result set.
+
+        Columns: `acn`, `priority`, `priority_band`, `hazard_categories` (semicolon-joined),
+        `state`, `report_date`, `synopsis`, `assigned_analyst_id`.
+      parameters:
+        - { name: category,     in: query, schema: { type: string },  description: hazard category code }
+        - { name: state,        in: query, schema: { type: string, enum: [new, triaged, escalated, closed] } }
+        - { name: priority_min, in: query, schema: { type: integer, minimum: 0, maximum: 100 } }
+        - { name: flight_date,  in: query, schema: { type: string, format: date } }
+        - { name: q,            in: query, schema: { type: string }, description: full-text search over the narrative }
+        - { name: format,       in: query, schema: { type: string, enum: [csv], default: csv }, description: only csv today - PDF was scoped out }
+      responses:
+        '200':
+          description: CSV file of the filtered, ranked worklist
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   /reports/{report_id}:
     get:
       tags: [reports]

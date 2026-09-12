@@ -7,6 +7,15 @@ The format is `YYYY-MM-DD - what changed - why - signed off by`.
 
 ## Unreleased
 
+- **2026-09-12** - New `GET /reports/export`. Same filter parameters as `GET /reports`
+  (`category`, `state`, `priority_min`, `flight_date`, `q`), analyst-role, streamed as CSV
+  instead of a JSON page. Added because there was no way to hand the worklist to a safety
+  review board or auditor short of screen-scraping the console - a gap found by reading every
+  route in `services/api/routers/`, not by a feature request. `flight_date` is accepted for
+  parity with `GET /reports` but is not applied, matching that route's own existing (not new)
+  behaviour. `format` only accepts `csv` today; PDF export was scoped out to avoid a new
+  dependency for a stretch goal. - Nisarg
+
 - **2026-09-09** - `QueueStats.workers` description corrected, no type change. It said
   "ECS RunningTaskCount" unqualified, which is what the field will mean once Sowmya's
   CloudWatch/ContainerInsights plumbing lands, but the implementation right now derives it

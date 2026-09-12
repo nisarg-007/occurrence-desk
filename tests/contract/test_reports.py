@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import csv
+import io
+
 
 def test_worklist_is_ordered_by_priority_descending(client, analyst_headers):
     items = client.get("/api/v1/reports", headers=analyst_headers).json()["items"]
@@ -65,6 +68,44 @@ def test_analyst_cannot_dispose_of_another_analysts_report(client, analyst_heade
         "/api/v1/reports/2/disposition", json={"state": "triaged"}, headers=analyst_headers
     )
     assert r.status_code == 403
+
+
+def test_export_returns_csv_with_the_documented_columns(client, analyst_headers):
+    r = client.get("/api/v1/reports/export", headers=analyst_headers)
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/csv")
+    assert "attachment" in r.headers["content-disposition"]
+
+    rows = list(csv.reader(io.StringIO(r.text)))
+    assert rows[0] == [
+        "acn",
+        "priority",
+        "priority_band",
+        "hazard_categories",
+        "state",
+        "report_date",
+        "synopsis",
+        "assigned_analyst_id",
+    ]
+    # Same four fixture reports the in-memory repo seeds in tests (full_sample=False).
+    assert len(rows) - 1 == 4
+
+
+def test_export_respects_priority_min_filter(client, analyst_headers):
+    all_rows = list(csv.reader(io.StringIO(
+        client.get("/api/v1/reports/export", headers=analyst_headers).text
+    )))[1:]
+    filtered_rows = list(csv.reader(io.StringIO(
+        client.get("/api/v1/reports/export?priority_min=30", headers=analyst_headers).text
+    )))[1:]
+
+    assert len(filtered_rows) < len(all_rows)
+    assert all(int(row[1]) >= 30 for row in filtered_rows)
+
+
+def test_export_requires_auth(client):
+    r = client.get("/api/v1/reports/export")
+    assert r.status_code == 401
 
 
 def test_disposition_changes_the_state(client, analyst_headers):
