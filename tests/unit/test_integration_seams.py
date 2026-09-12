@@ -70,9 +70,9 @@ def test_the_worker_writes_the_ingest_event_the_api_counts():
     counted = inspect.getsource(sql_repo_module.SqlRepo.parsed_in_last_60s)
     for side, source in (("worker write", written), ("API read", counted)):
         assert "EVENT_DOCUMENT_PARSED" in source, f"{side} does not use the shared constant"
-        assert (
-            f'"{models.EVENT_DOCUMENT_PARSED}"' not in source
-        ), f"{side} hard-codes the event name again - use models.EVENT_DOCUMENT_PARSED"
+        assert f'"{models.EVENT_DOCUMENT_PARSED}"' not in source, (
+            f"{side} hard-codes the event name again - use models.EVENT_DOCUMENT_PARSED"
+        )
 
 
 def test_worker_store_refuses_an_unknown_backend_rather_than_defaulting():
@@ -114,3 +114,87 @@ def test_api_repo_choice_follows_the_same_rule_as_the_worker():
     rule = inspect.getsource(deps._default_repo)
     assert "DATABASE_URL" in rule
     assert "OCCDESK_REPO" in rule
+
+
+def test_extraction_record_hazards_carry_no_label_key():
+    """The shape contract between the parser and everything downstream.
+
+    An extraction record's hazards are {code, confidence, source}. The human
+    label lives in `hazard_categories`, not on the record. Pinning it here
+    because a consumer assuming otherwise is not a hypothetical - see the
+    next test.
+    """
+    import sys
+
+    sys.path.insert(0, "services/worker")
+    import parser as worker_parser
+
+    lines = [
+        (1, 0.0, "ACN: 123"),
+        (1, 1.0, "Events"),
+        (1, 2.0, "Anomaly.Conflict : NMAC"),
+        (1, 3.0, "Narrative: 1"),
+        (1, 4.0, "Something happened."),
+    ]
+    record = worker_parser._parse_one_record(lines, "123", 1, 1, 1)
+
+    assert record["hazards"], "a record with an Anomaly axis must produce a hazard"
+    assert set(record["hazards"][0]) == {"code", "confidence", "source"}
+
+
+def test_alert_label_is_resolved_from_the_taxonomy_not_read_off_the_record():
+    """`sql_store` read `hazards[0]["label"]`, which no extraction record has.
+
+    Every upload raised `KeyError: 'label'` inside `save_reports` and was marked
+    failed - after its reports had already been committed, so the database held
+    50 reports under a document that claimed it failed. `tests/unit/test_alerts.py`
+    passes a hand-written `hazard_label="Conflict"` straight into `maybe_alert`,
+    so it never touched the line that builds that argument. Same shape of gap as
+    the three bugs above: each side correct alone, wrong where they meet.
+    """
+    from services.worker.sql_store import _alert_hazard_label
+
+    nasa_only = {"hazards": [{"code": "conflict", "confidence": 1.0, "source": "nasa"}]}
+    assert _alert_hazard_label(nasa_only, {"conflict": "Conflict"}) == "Conflict"
+
+    # a code with no taxonomy row degrades to the code itself, and must not raise
+    assert _alert_hazard_label(nasa_only, {}) == "conflict"
+
+    # no hazards at all is legitimate, and must not raise
+    assert _alert_hazard_label({"hazards": []}, {}) is None
+    assert _alert_hazard_label({}, {}) is None
+
+    # NASA's own coding is preferred over the model's guess for what a human reads
+    mixed = {
+        "hazards": [
+            {"code": "guessed", "confidence": 0.7, "source": "model"},
+            {"code": "conflict", "confidence": 1.0, "source": "nasa"},
+        ]
+    }
+    labels = {"conflict": "Conflict", "guessed": "Guessed"}
+    assert _alert_hazard_label(mixed, labels) == "Conflict"
+
+
+def test_no_worker_code_reads_a_label_off_an_extraction_record_hazard():
+    """The guard that would actually have caught it.
+
+    The two tests above pin the contract and the helper, but neither fires if
+    someone writes `hazards[0]["label"]` again somewhere else - which is exactly
+    how it arrived. Extraction-record hazards have no `label`, so indexing one
+    for it is always a crash waiting for the next upload.
+    """
+    import sys
+
+    sys.path.insert(0, "services/worker")
+    import parser as worker_parser
+
+    from services.worker import hazards, sql_store
+
+    for module in (sql_store, hazards, worker_parser):
+        source = inspect.getsource(module)
+        offenders = re.findall(r'\[\s*["\']label["\']\s*\]', source)
+        assert not offenders, (
+            f"{module.__name__} indexes a hazard dict with ['label'], which no "
+            "extraction record carries - resolve it from hazard_categories instead "
+            "(see sql_store._alert_hazard_label)"
+        )
