@@ -159,6 +159,19 @@ def _hazard_category_ids(session) -> dict[str, int]:
     return dict(session.execute(select(models.HazardCategory.code, models.HazardCategory.id)).all())
 
 
+def _hazard_category_labels(session) -> dict[str, str]:
+    """code -> human label, e.g. 'conflict' -> 'Conflict'.
+
+    Extraction records carry only `code`, `confidence` and `source` (see
+    parser.py and hazards.py) - the readable label lives in the taxonomy
+    table, so anything wanting to show a label to a human has to resolve it
+    here rather than expect it on the record.
+    """
+    return dict(
+        session.execute(select(models.HazardCategory.code, models.HazardCategory.label)).all()
+    )
+
+
 def _write_hazards(
     session, report_id: int, hazards: list[dict], categories: dict[str, int]
 ) -> None:
@@ -196,6 +209,24 @@ def _write_hazards(
         )
 
 
+def _alert_hazard_label(record: dict, category_labels: dict[str, str]) -> str | None:
+    """The label to name in a webhook alert, or None if there is nothing useful.
+
+    Prefers NASA's own coding over the model's guess: an alert saying a report
+    is critical should quote the taxonomy a human assigned, not a prediction.
+    Falls back to the raw code if the taxonomy has no row for it (the same
+    situation `_write_hazards` folds into `other`), and to None if the record
+    carries no hazards at all - all three are fine for an alert, none of them
+    should stop a document being saved.
+    """
+    hazards = record.get("hazards") or []
+    if not hazards:
+        return None
+    chosen = next((h for h in hazards if h.get("source") == "nasa"), hazards[0])
+    code = chosen.get("code")
+    return category_labels.get(code, code)
+
+
 def save_reports(document_id: int, extracted_records: list[dict]) -> int:
     """INSERT ... ON CONFLICT (acn) DO NOTHING, plus the child rows.
 
@@ -209,6 +240,7 @@ def save_reports(document_id: int, extracted_records: list[dict]) -> int:
     inserted: list[tuple[int, dict]] = []
     with session_scope() as session:
         categories = _hazard_category_ids(session)
+        category_labels = _hazard_category_labels(session)
         for record in extracted_records:
             report_id = session.execute(
                 insert(models.Report)
@@ -264,12 +296,11 @@ def save_reports(document_id: int, extracted_records: list[dict]) -> int:
                 select(models.Report.priority).where(models.Report.id == report_id)
             )
         if priority is not None:
-            hazards = record.get("hazards") or []
             alerts.maybe_alert(
                 report_id=report_id,
                 acn=record["acn"],
                 priority=priority,
-                hazard_label=hazards[0]["label"] if hazards else None,
+                hazard_label=_alert_hazard_label(record, category_labels),
                 settings=settings,
             )
 
