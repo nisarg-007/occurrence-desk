@@ -648,6 +648,46 @@ input[type="password"] {
   margin: var(--sp-3) 0 0; min-height: 1.2em; color: var(--sev-critical);
 }
 
+/* ---------- upload page -------------------------------------------- */
+.upload-card { max-width: 44rem; }
+
+.dropzone {
+  border: 1.5px dashed var(--line);
+  border-radius: var(--radius);
+  padding: var(--sp-7) var(--sp-5);
+  text-align: center;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dropzone { transition: border-color 150ms ease, background 150ms ease; }
+}
+.dropzone:hover { border-color: var(--ink-3); }
+.dropzone--over, .dropzone:focus-visible {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-fill) 5%, transparent);
+}
+.dropzone-title { margin: 0 0 var(--sp-1); font-weight: 600; }
+.chosen-file { margin: var(--sp-3) 0 0; font-size: var(--t-small); }
+
+.upload-steps {
+  margin: var(--sp-4) 0 0; padding-left: 1.2rem;
+  font-size: var(--t-small); color: var(--ink-3);
+}
+.upload-steps li { padding: 2px 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .upload-steps li { transition: color 150ms ease, font-weight 150ms ease; }
+}
+/* Step colours reuse the same documented tokens as everywhere else in the
+   file — ink for the active step (16.7:1), sev-moderate for done (5.4:1 light /
+   9.4:1 dark), ink-3 for not-yet-reached (5.0:1, the floor) — plus weight, so
+   "which step is active" never rests on colour alone. */
+.upload-steps li[data-state="active"] { color: var(--ink); font-weight: 600; }
+.upload-steps li[data-state="done"] { color: var(--sev-moderate); }
+
+.upload-actions { margin: var(--sp-4) 0 0; }
+.upload-out { margin: var(--sp-3) 0 0; min-height: 1.2em; }
+.upload-out--error { color: var(--sev-critical); }
+
 input[type="text"]:focus,
 input[type="email"]:focus,
 input[type="password"]:focus {

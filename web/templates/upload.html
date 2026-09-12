@@ -9,29 +9,28 @@
   </div>
 </div>
 
-<div class="card" style="max-width:44rem">
+<div class="card upload-card">
   <div class="card-body">
-    <div id="drop" tabindex="0" role="button" aria-describedby="steps"
-         style="border:1.5px dashed var(--line);border-radius:var(--radius);padding:var(--sp-7) var(--sp-5);text-align:center;cursor:pointer">
-      <p style="margin:0 0 var(--sp-1);font-weight:600">Choose a PDF, or drop one here</p>
-      <p class="tiny" style="margin:0">ASRS report set · up to 25 MB</p>
+    <div id="drop" class="dropzone" tabindex="0" role="button" aria-describedby="steps">
+      <p class="dropzone-title">Choose a PDF, or drop one here</p>
+      <p class="tiny">ASRS report set · up to 25 MB</p>
       <input id="file" type="file" accept="application/pdf" hidden>
     </div>
 
-    <p id="chosen" class="muted" style="margin:var(--sp-3) 0 0;font-size:var(--t-small)"></p>
+    <p id="chosen" class="muted chosen-file"></p>
 
-    <ol id="steps" style="margin:var(--sp-4) 0 0;padding-left:1.2rem;font-size:var(--t-small);color:var(--ink-3)">
+    <ol id="steps" class="upload-steps">
       <li data-step="hash">Hash the file</li>
       <li data-step="reserve">Reserve a document</li>
       <li data-step="upload">Upload to object storage</li>
       <li data-step="complete">Queue it for parsing</li>
     </ol>
 
-    <p style="margin:var(--sp-4) 0 0">
+    <p class="upload-actions">
       <button id="go" class="btn" disabled>Upload</button>
       <a class="btn secondary" href="/console">Back to worklist</a>
     </p>
-    <p id="out" role="status" class="tiny" style="margin:var(--sp-3) 0 0;min-height:1.2em"></p>
+    <p id="out" role="status" class="tiny upload-out"></p>
   </div>
 </div>
 {% endblock %}
@@ -45,16 +44,18 @@ const input = document.getElementById("file");
 const go = document.getElementById("go");
 let file = null;
 
-const say = (m, bad) => { out.textContent = m; out.style.color = bad ? "var(--sev-critical)" : "var(--ink-2)"; };
+// Inline, next to the control it's about — not a separate validation summary
+// somewhere else on the page. The one thing being validated here is "is this a
+// PDF," so the error lands in the same status line the upload's own progress
+// later uses, rather than inventing a second place to look.
+const say = (m, bad) => { out.textContent = m; out.classList.toggle("upload-out--error", !!bad); };
 const mark = (step, state) => {
-  const li = document.querySelector(`[data-step="${step}"]`);
-  li.style.color = state === "done" ? "var(--sev-moderate)" : state === "active" ? "var(--ink)" : "var(--ink-3)";
-  li.style.fontWeight = state === "active" ? "600" : "400";
+  document.querySelector(`[data-step="${step}"]`).dataset.state = state || "";
 };
 
 function choose(f) {
   if (!f) return;
-  if (f.type !== "application/pdf") return say("That isn’t a PDF.", true);
+  if (f.type !== "application/pdf") return say("That isn’t a PDF. Choose a .pdf file.", true);
   file = f;
   document.getElementById("chosen").textContent = `${f.name} · ${(f.size / 1048576).toFixed(1)} MB`;
   go.disabled = false;
@@ -64,9 +65,9 @@ function choose(f) {
 drop.onclick = () => input.click();
 drop.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } };
 input.onchange = () => choose(input.files[0]);
-drop.ondragover = (e) => { e.preventDefault(); drop.style.borderColor = "var(--accent)"; };
-drop.ondragleave = () => { drop.style.borderColor = "var(--line)"; };
-drop.ondrop = (e) => { e.preventDefault(); drop.style.borderColor = "var(--line)"; choose(e.dataTransfer.files[0]); };
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("dropzone--over"); };
+drop.ondragleave = () => { drop.classList.remove("dropzone--over"); };
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("dropzone--over"); choose(e.dataTransfer.files[0]); };
 
 async function sha256Hex(buf) {
   const digest = await crypto.subtle.digest("SHA-256", buf);
