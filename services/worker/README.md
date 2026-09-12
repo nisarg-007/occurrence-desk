@@ -38,6 +38,22 @@ Current measured values, with the commands that produced them, live in
 `docs/measurements.md` — not here, so there is one place to look and one place
 to keep honest.
 
+## Parser behaviours worth knowing
+
+- **`Callback: N` blocks fold into `narrative`.** ASRS sometimes appends an
+  analyst's follow-up note to a report. The extraction contract has no
+  `callback` field, so that prose lands in `narrative` alongside the
+  reporter's own. Deliberate, not an oversight — but it means narrative text
+  is occasionally reporter + analyst, which matters if you are training on it.
+- **`report_date` is always null.** NASA's `Date` is `YYYYMM` — month
+  precision, no day. Rather than invent a day to satisfy a `date` type, the
+  raw value stays verbatim in `coded` / `fields` and the typed column stays
+  empty.
+- **Hazards are deduplicated per axis.** `Anomaly.Conflict : NMAC` and a
+  second `Anomaly.Conflict` value on the same record produce one `nasa`
+  hazard row, because `report_hazards` is keyed
+  `(report_id, category_id, source)`. The sub-values survive in `fields`.
+
 ## Layout
 
 | File | What it does |
