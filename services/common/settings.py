@@ -38,6 +38,8 @@ class Settings(BaseSettings):
 
     queue_stats_cache_seconds: int = 5
 
+    ai_chat_key: str = ""  # xAI / Grok API key — set via GROK_API_KEY env var (never commit a real key)
+
     @property
     def is_local(self) -> bool:
         return self.app_env == "local"

@@ -21,7 +21,15 @@
       <a href="/console"           {% if nav == "worklist" %}aria-current="page"{% endif %}>Worklist</a>
       <a href="/console/dashboard" {% if nav == "dashboard" %}aria-current="page"{% endif %}>Dashboard</a>
       <a href="/console/upload"    {% if nav == "upload" %}aria-current="page"{% endif %}>Upload</a>
-      <a href="/docs">API</a>
+      <button class="tabs-ai-btn" id="chat-toggle" aria-controls="chat-panel" aria-expanded="false" title="Ask AI about the database">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M2 3.5A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5v6A1.5 1.5 0 0112.5 11H9l-3 2.5V11H3.5A1.5 1.5 0 012 9.5v-6z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          <circle cx="5.5" cy="6.5" r=".8" fill="currentColor"/>
+          <circle cx="8" cy="6.5" r=".8" fill="currentColor"/>
+          <circle cx="10.5" cy="6.5" r=".8" fill="currentColor"/>
+        </svg>
+        <span>Ask AI</span>
+      </button>
     </nav>
     <div class="identity">
       <span class="chip" id="dev-session-badge" hidden>dev auto-signin</span>
@@ -131,5 +139,153 @@
   });
   </script>
   {% block scripts %}{% endblock %}
+
+  <!-- ── AI Chat Panel ──────────────────────────────────────────────────── -->
+  <div id="chat-panel" class="chat-panel" aria-label="AI assistant" hidden>
+    <div class="chat-header">
+      <span class="chat-title">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M2 3.5A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5v6A1.5 1.5 0 0112.5 11H9l-3 2.5V11H3.5A1.5 1.5 0 012 9.5v-6z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+        </svg>
+        AI Assistant
+      </span>
+      <button class="chat-close" id="chat-close" aria-label="Close AI assistant">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="chat-hint">Answers are grounded in live database data.</div>
+    <div class="chat-messages" id="chat-messages" aria-live="polite" aria-atomic="false">
+      <div class="chat-msg assistant">
+        <div class="chat-bubble">
+          Hello! I can answer questions about the occurrence database — report counts, hazard trends, priority distributions, and more. What would you like to know?
+        </div>
+      </div>
+    </div>
+    <form class="chat-form" id="chat-form" autocomplete="off">
+      <input
+        type="text"
+        id="chat-input"
+        class="chat-input"
+        placeholder="Ask about reports, hazards, priorities…"
+        aria-label="Ask a question about the database"
+        required
+        maxlength="500"
+      >
+      <button class="chat-send" type="submit" aria-label="Send">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M13.5 8L2.5 2.5l2 5.5-2 5.5L13.5 8z" fill="currentColor"/>
+        </svg>
+      </button>
+    </form>
+  </div>
+  <div id="chat-backdrop" class="chat-backdrop" hidden></div>
+
+  <script>
+  // ── Chat panel logic ────────────────────────────────────────────────────
+  (function chatPanel() {
+    const toggle   = document.getElementById("chat-toggle");
+    const panel    = document.getElementById("chat-panel");
+    const closeBtn = document.getElementById("chat-close");
+    const backdrop = document.getElementById("chat-backdrop");
+    const form     = document.getElementById("chat-form");
+    const input    = document.getElementById("chat-input");
+    const msgs     = document.getElementById("chat-messages");
+    const API_PREFIX = "{{ api_prefix }}";
+
+    function open() {
+      panel.hidden = false;
+      backdrop.hidden = false;
+      toggle.setAttribute("aria-expanded", "true");
+      panel.classList.add("chat-panel--open");
+      input.focus();
+    }
+    function close() {
+      panel.hidden = true;
+      backdrop.hidden = true;
+      toggle.setAttribute("aria-expanded", "false");
+      panel.classList.remove("chat-panel--open");
+    }
+
+    toggle.addEventListener("click", () => panel.hidden ? open() : close());
+    closeBtn.addEventListener("click", close);
+    backdrop.addEventListener("click", close);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !panel.hidden) close();
+    });
+
+    function appendMsg(role, text, isError) {
+      const div = document.createElement("div");
+      div.className = "chat-msg " + role;
+      const bubble = document.createElement("div");
+      bubble.className = "chat-bubble" + (isError ? " chat-bubble--error" : "");
+      bubble.textContent = text;
+      div.appendChild(bubble);
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
+      return div;
+    }
+
+    function appendTyping() {
+      const div = document.createElement("div");
+      div.className = "chat-msg assistant";
+      div.id = "chat-typing";
+      div.innerHTML = '<div class="chat-bubble chat-bubble--typing"><span></span><span></span><span></span></div>';
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
+      return div;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = "";
+      input.disabled = true;
+      form.querySelector(".chat-send").disabled = true;
+
+      appendMsg("user", text);
+      const typing = appendTyping();
+
+      try {
+        const r = await fetch(`${API_PREFIX}/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(Session.token ? { "Authorization": `Bearer ${Session.token}` } : {}),
+          },
+          body: JSON.stringify({ message: text }),
+        });
+
+        typing.remove();
+
+        if (r.status === 401) {
+          appendMsg("assistant", "You need to sign in to use the AI assistant.", true);
+          return;
+        }
+        if (r.status === 503) {
+          appendMsg("assistant", "AI assistant is not configured yet. Ask your admin to set GROK_API_KEY.", true);
+          return;
+        }
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          appendMsg("assistant", (err.detail || "Something went wrong. Please try again."), true);
+          return;
+        }
+
+        const data = await r.json();
+        appendMsg("assistant", data.reply);
+      } catch (err) {
+        typing.remove();
+        appendMsg("assistant", "Network error. Check your connection and try again.", true);
+      } finally {
+        input.disabled = false;
+        form.querySelector(".chat-send").disabled = false;
+        input.focus();
+      }
+    });
+  })();
+  </script>
 </body>
 </html>

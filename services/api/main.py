@@ -20,7 +20,7 @@ from services.api import charts, latency, metrics, presentation, problems
 from services.api.deps import analyst, get_repo
 from services.api.deps import settings as settings_dep
 from services.api.problems import ApiProblem, problem_response
-from services.api.routers import auth, documents, ops, queue, reports
+from services.api.routers import auth, chat, documents, ops, queue, reports
 from services.api.security import Principal, issue_token
 from services.common import logging as jlog
 from services.common.settings import Settings, get_settings
@@ -91,7 +91,7 @@ async def _validation(request: Request, exc: RequestValidationError) -> JSONResp
     )
 
 
-for r in (auth.router, documents.router, reports.router, queue.router):
+for r in (auth.router, chat.router, documents.router, reports.router, queue.router):
     app.include_router(r, prefix=API_PREFIX)
 app.include_router(ops.router)  # /healthz /readyz /metrics stay unversioned for the ALB
 
