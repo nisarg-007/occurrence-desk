@@ -11,7 +11,7 @@
 <div id="dashboard"
      hx-get="/console/fragments/dashboard"
      hx-trigger="load, every 5s"
-     hx-swap="innerHTML"
+     hx-swap="innerHTML settle:180ms"
      aria-live="polite" aria-busy="true">
   <div class="card"><div class="card-body">
     <span class="skeleton" style="width:40%;display:block"></span>

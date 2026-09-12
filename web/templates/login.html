@@ -1,23 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Sign in &middot; Occurrence Desk{% endblock %}
 {% block content %}
-<div class="card" style="max-width:24rem;margin:var(--sp-7) auto">
+<div class="card auth-card">
   <div class="card-head"><h2>Sign in</h2></div>
   <div class="card-body">
     <form id="signin" novalidate>
-      <p style="margin:0 0 var(--sp-3)">
-        <label for="email" style="display:block;font-size:var(--t-small);font-weight:550;margin-bottom:var(--sp-1)">Email</label>
+      <div class="field">
+        <label for="email">Email</label>
         <input id="email" name="email" type="email" autocomplete="username" required
-               placeholder="analyst@occdesk.example" aria-describedby="err"
-               style="width:100%;min-height:36px;padding:0 var(--sp-3);border:1px solid var(--line);border-radius:var(--radius-s);background:var(--surface);color:var(--ink);font:var(--t-body) var(--sans)">
-      </p>
-      <p style="margin:0 0 var(--sp-4)">
-        <label for="password" style="display:block;font-size:var(--t-small);font-weight:550;margin-bottom:var(--sp-1)">Password</label>
+               placeholder="analyst@occdesk.example" aria-describedby="email-error">
+        <p id="email-error" class="field-error" role="alert" hidden></p>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
         <input id="password" name="password" type="password" autocomplete="current-password" required
-               style="width:100%;min-height:36px;padding:0 var(--sp-3);border:1px solid var(--line);border-radius:var(--radius-s);background:var(--surface);color:var(--ink);font:var(--t-body) var(--sans)">
-      </p>
+               aria-describedby="password-error">
+        <p id="password-error" class="field-error" role="alert" hidden></p>
+      </div>
       <button class="btn" type="submit" style="width:100%">Sign in</button>
-      <p id="err" role="alert" class="tiny" style="margin:var(--sp-3) 0 0;min-height:1.2em;color:var(--sev-critical)"></p>
+      <p id="err" role="alert" class="tiny form-error" hidden></p>
     </form>
   </div>
 </div>
@@ -29,21 +30,66 @@ const API = "{{ api_prefix }}";
 const err = document.getElementById("err");
 const params = new URLSearchParams(location.search);
 
+// Inline, per-field validation — an analyst finds out *which* field is wrong,
+// and why, next to that field, rather than guessing from one message at the
+// bottom after submitting. Runs on blur (so nothing is flagged before anyone
+// has had a chance to type) and again on submit (so a field left untouched is
+// still caught).
+function fieldError(input, message) {
+  const p = document.getElementById(input.id + "-error");
+  if (message) {
+    p.textContent = message;
+    p.hidden = false;
+    input.setAttribute("aria-invalid", "true");
+  } else {
+    p.hidden = true;
+    input.removeAttribute("aria-invalid");
+  }
+  return !message;
+}
+
+function validate(input) {
+  if (input.validity.valueMissing) {
+    return fieldError(input, input.type === "email" ? "Enter your email address." : "Enter your password.");
+  }
+  if (input.type === "email" && input.validity.typeMismatch) {
+    return fieldError(input, "Enter a valid email address, like name@example.com.");
+  }
+  return fieldError(input, "");
+}
+
+const email = document.getElementById("email");
+const password = document.getElementById("password");
+[email, password].forEach((input) => {
+  input.addEventListener("blur", () => validate(input));
+  input.addEventListener("input", () => {
+    // Once a field has shown an error, clear it the moment the field becomes
+    // valid again rather than waiting for the next blur — the correction
+    // should read back immediately.
+    if (input.getAttribute("aria-invalid") === "true") validate(input);
+  });
+});
+
 document.getElementById("signin").addEventListener("submit", async (ev) => {
   ev.preventDefault();
+  const emailOk = validate(email);
+  const passwordOk = validate(password);
+  if (!emailOk || !passwordOk) {
+    (emailOk ? password : email).focus();
+    return;
+  }
+
   const btn = ev.target.querySelector("button");
-  btn.disabled = true; btn.textContent = "Signing in…"; err.textContent = "";
+  btn.disabled = true; btn.textContent = "Signing in…"; err.hidden = true;
   try {
     const r = await fetch(`${API}/auth/login`, {
       method: "POST", headers: {"content-type": "application/json"},
-      body: JSON.stringify({
-        email: document.getElementById("email").value,
-        password: document.getElementById("password").value,
-      }),
+      body: JSON.stringify({ email: email.value, password: password.value }),
     });
     if (!r.ok) {
       // The API deliberately does not say which half was wrong. Neither does this.
       err.textContent = "Email or password is incorrect.";
+      err.hidden = false;
       return;
     }
     Session.token = (await r.json()).access_token;
@@ -51,6 +97,7 @@ document.getElementById("signin").addEventListener("submit", async (ev) => {
     location.href = next && next.startsWith("/console") ? next : "/console";
   } catch {
     err.textContent = "Couldn’t reach the server. Is it still running?";
+    err.hidden = false;
   } finally {
     btn.disabled = false; btn.textContent = "Sign in";
   }

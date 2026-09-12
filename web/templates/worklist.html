@@ -45,9 +45,12 @@
 </script>
 
 <div class="stack">
-  <div class="card">
+  <!-- Flat, not a card: this strip is glanceable context for the table below it,
+       not a peer panel competing with it. The ranked list is what an analyst is
+       here to read, so it gets the one full-weight card on this page. -->
+  <div class="card card-flat">
     <div class="strip" id="stats" hx-get="/console/fragments/stats" hx-trigger="load, every 10s"
-         hx-swap="innerHTML" aria-live="polite">
+         hx-swap="innerHTML settle:150ms" aria-live="polite">
       <div class="stat"><div class="k">Open reports</div><div class="v"><span class="skeleton" style="width:3ch;display:inline-block"></span></div></div>
     </div>
   </div>
@@ -55,7 +58,7 @@
   <div class="card">
     <div class="table-wrap">
       <table class="data">
-        <caption class="tiny" style="text-align:left;padding:var(--sp-3) var(--sp-4) 0">
+        <caption class="table-caption">
           Refreshes every five seconds.
         </caption>
         <thead>
@@ -71,7 +74,7 @@
         <tbody id="worklist"
                hx-get="/console/fragments/worklist"
                hx-trigger="load, every 5s [!manuallyPaged]"
-               hx-swap="innerHTML"
+               hx-swap="innerHTML settle:120ms"
                aria-live="polite" aria-busy="true">
           <tr><td colspan="6"><span class="skeleton" style="width:40%"></span></td></tr>
         </tbody>

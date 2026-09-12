@@ -111,14 +111,20 @@ a:hover { text-decoration-thickness: 2px; }
 .skip:focus { left: var(--sp-4); top: var(--sp-4); }
 
 /* ---------- header ---------------------------------------------------- */
+/* Design Guideline: Liquid Glass, Regular variant — a text-heavy navigation bar
+   reads best as a translucent, blurred layer floating above content, not fused to
+   it. Regular variant calls for 0.6-0.8 background opacity and enough blur (20-40px)
+   that scrolled content is legible-but-abstracted underneath, never sharp. 76%
+   opacity + 24px blur sits in that range; saturate(1.3) keeps colour underneath from
+   looking washed out through the glass, matching the platform's own toolbar material. */
 .masthead {
   position: sticky; top: 0; z-index: 5;
   display: flex; align-items: center; gap: var(--sp-5);
   flex-wrap: wrap;
   padding: var(--sp-3) var(--sp-5);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  backdrop-filter: saturate(1.3) blur(12px);
-  -webkit-backdrop-filter: saturate(1.3) blur(12px);
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  backdrop-filter: saturate(1.4) blur(24px);
+  -webkit-backdrop-filter: saturate(1.4) blur(24px);
   border-bottom: 1px solid var(--line);
 }
 .wordmark {
@@ -154,12 +160,19 @@ a:hover { text-decoration-thickness: 2px; }
 main { padding: var(--sp-5); max-width: 1180px; margin-inline: auto; }
 .stack > * + * { margin-top: var(--sp-4); }
 
+/* HIG layout: give the page's own identity room to breathe before the content
+   groups start — a bigger gap here than between cards in the stack below is what
+   makes "this is the page title" read as a different kind of space than "these
+   are two related panels." 8pt-grid token, not a new magic number. */
 .page-head {
   display: flex; align-items: flex-end; gap: var(--sp-4);
-  flex-wrap: wrap; margin-bottom: var(--sp-4);
+  flex-wrap: wrap; margin-bottom: var(--sp-6);
 }
 .page-head h1 { margin: 0; font-size: var(--t-h1); letter-spacing: -.02em; font-weight: 640; }
-.page-head p  { margin: 0; color: var(--ink-2); font-size: var(--t-small); }
+/* Caption role: secondary to the title in every axis at once (size, weight via
+   the sans stack's regular cut, and colour) so the hierarchy holds even if the
+   page is zoomed — no single dimension is left to carry it alone. */
+.page-head p  { margin: 0; color: var(--ink-2); font-size: var(--t-small); font-weight: 450; }
 
 .card {
   background: var(--surface);
@@ -336,6 +349,20 @@ dl.fields dd { margin: 0; }
 .htmx-indicator { opacity: 0; transition: opacity .15s; }
 .htmx-request .htmx-indicator { opacity: 1; }
 
+/* Motion > frequent HTMX swaps: the worklist, stats strip, dashboard and report
+   panel all poll or load-and-replace their content. A hard cut on every swap
+   reads as a flicker at 5-10s intervals; a brief cross-fade (htmx's own
+   `settle:` modifier gives new content the .htmx-settling class for exactly the
+   named duration) reads as a refresh instead. Kept short — 120-180ms, under the
+   150-250ms ceiling — because it repeats often and must stay in the background,
+   not draw the eye each time. */
+@media (prefers-reduced-motion: no-preference) {
+  .htmx-settling { opacity: 0; }
+  #stats, #worklist, #dashboard, #report {
+    transition: opacity 180ms ease;
+  }
+}
+
 /* Motion is decorative here. If someone has asked the OS for less of it,
    there is nothing in this UI that needs to move. */
 @media (prefers-reduced-motion: reduce) {
@@ -491,6 +518,17 @@ details.explain[open] summary { color: var(--ink); font-weight: 550; }
     0 8px 24px -8px color-mix(in srgb, var(--ink) 8%, transparent);
   border: none;
 }
+/* Secondary-weight variant: same surface and radius, no shadow — for panels that
+   are glanceable context rather than a focal panel of their own (e.g. the stats
+   strip above the worklist table). Keeps the "one card competes with the next
+   for the eye" problem from happening when several sit in one stack. */
+.card-flat { box-shadow: none; background: var(--surface-2); }
+
+.table-caption {
+  text-align: left; padding: var(--sp-3) var(--sp-4) 0;
+  color: var(--ink-3); font-size: var(--t-micro);
+}
+
 .card > .card-head {
   padding: var(--sp-4) var(--sp-5) var(--sp-3);
 }
@@ -590,6 +628,66 @@ input[type="password"] {
   width: 100%;
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
+/* Sign-in card: a focused, single-purpose sheet rather than a full-width page —
+   this is the one screen where the content itself is a single small task. */
+.auth-card { max-width: 24rem; margin: var(--sp-7) auto; }
+
+/* One field = one label + one control + one place for its own error, so
+   validation never has to point at a field from a distance. */
+.field { margin: 0 0 var(--sp-4); }
+.field label {
+  display: block; font-size: var(--t-small); font-weight: 550;
+  color: var(--ink); margin-bottom: var(--sp-1);
+}
+.field-error {
+  margin: var(--sp-1) 0 0; font-size: var(--t-micro);
+  color: var(--sev-critical); /* 5.8:1 light / 6.5:1 dark on --surface, documented at top of file */
+}
+.field input[aria-invalid="true"] { border-color: var(--sev-critical); }
+.form-error {
+  margin: var(--sp-3) 0 0; min-height: 1.2em; color: var(--sev-critical);
+}
+
+/* ---------- upload page -------------------------------------------- */
+.upload-card { max-width: 44rem; }
+
+.dropzone {
+  border: 1.5px dashed var(--line);
+  border-radius: var(--radius);
+  padding: var(--sp-7) var(--sp-5);
+  text-align: center;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dropzone { transition: border-color 150ms ease, background 150ms ease; }
+}
+.dropzone:hover { border-color: var(--ink-3); }
+.dropzone--over, .dropzone:focus-visible {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-fill) 5%, transparent);
+}
+.dropzone-title { margin: 0 0 var(--sp-1); font-weight: 600; }
+.chosen-file { margin: var(--sp-3) 0 0; font-size: var(--t-small); }
+
+.upload-steps {
+  margin: var(--sp-4) 0 0; padding-left: 1.2rem;
+  font-size: var(--t-small); color: var(--ink-3);
+}
+.upload-steps li { padding: 2px 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .upload-steps li { transition: color 150ms ease, font-weight 150ms ease; }
+}
+/* Step colours reuse the same documented tokens as everywhere else in the
+   file — ink for the active step (16.7:1), sev-moderate for done (5.4:1 light /
+   9.4:1 dark), ink-3 for not-yet-reached (5.0:1, the floor) — plus weight, so
+   "which step is active" never rests on colour alone. */
+.upload-steps li[data-state="active"] { color: var(--ink); font-weight: 600; }
+.upload-steps li[data-state="done"] { color: var(--sev-moderate); }
+
+.upload-actions { margin: var(--sp-4) 0 0; }
+.upload-out { margin: var(--sp-3) 0 0; min-height: 1.2em; }
+.upload-out--error { color: var(--sev-critical); }
+
 input[type="text"]:focus,
 input[type="email"]:focus,
 input[type="password"]:focus {
@@ -650,14 +748,18 @@ input[type="password"]:focus {
   opacity: 1;
 }
 
-/* Header — frosted glass strip, like macOS toolbar */
+/* Design Guideline: Liquid Glass, Regular variant — the panel's own header is a
+   floating control strip above the message list, same material family as the
+   masthead: 78% opacity, 24px blur, both inside the documented 0.6-0.8 / 20-40px
+   range. The message list and input row below stay solid surface (not glass) so
+   scrolled text never sits behind two blurred layers at once. */
 .chat-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: var(--sp-3) var(--sp-4);
   border-bottom: 0.5px solid var(--line-soft);
-  background: color-mix(in srgb, var(--surface) 80%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border-radius: 16px 16px 0 0;
   flex-shrink: 0;
 }
@@ -783,4 +885,91 @@ input[type="password"]:focus {
     transform: none !important;
   }
   .chat-bubble--typing span { animation: none !important; opacity: 0.5; }
+}
+
+/* ---------- command palette trigger (masthead) ------------------------ */
+/* Ctrl/Cmd+K is the primary way in; this button exists only so mouse-only users
+   can discover the palette exists — the shortcut remains fully keyboard-operable
+   on its own, and the plain nav links beside it are never replaced by either. */
+.cmdk-trigger {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  min-height: 30px; padding: 0 var(--sp-2) 0 var(--sp-3);
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); color: var(--ink-3);
+  font: 550 var(--t-small)/1 var(--sans); cursor: pointer;
+}
+.cmdk-trigger:hover { background: var(--surface-2); color: var(--ink-2); }
+.cmdk-trigger-kbd {
+  font-family: var(--sans); font-size: var(--t-micro); font-weight: 600;
+  color: var(--ink-3); background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 5px; padding: 2px 6px; line-height: 1;
+}
+
+/* ---------- command palette (Ctrl/Cmd+K) -------------------------------
+   Design: a Spotlight-style jump list. The scrim is Liquid Glass (blur, so the
+   worklist is visibly still there, just abstracted); the dialog itself is a
+   solid, opaque surface — a dense scannable list is exactly the case HIG calls
+   out for staying off glass, where legibility over motion/content underneath
+   matters more than the material read. */
+.cmdk-backdrop {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 12vh;
+  background: color-mix(in srgb, var(--ink) 32%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.cmdk-backdrop[hidden] { display: none; }
+.cmdk {
+  width: min(560px, calc(100vw - 2 * var(--sp-5)));
+  max-height: min(60vh, 480px);
+  display: flex; flex-direction: column;
+  background: var(--surface); border-radius: 14px;
+  box-shadow:
+    0 0 0 0.5px color-mix(in srgb, var(--ink) 12%, transparent),
+    0 24px 64px -12px color-mix(in srgb, var(--ink) 32%, transparent);
+  overflow: hidden;
+}
+.cmdk-field {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-4);
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink-3); flex-shrink: 0;
+}
+.cmdk-input {
+  flex: 1; border: none; background: transparent; outline: none;
+  color: var(--ink); font: var(--t-lead) var(--sans);
+}
+.cmdk-input::placeholder { color: var(--ink-3); }
+.cmdk-list {
+  list-style: none; margin: 0; padding: var(--sp-2);
+  overflow-y: auto; overscroll-behavior: contain;
+}
+.cmdk-item {
+  display: flex; align-items: baseline; gap: var(--sp-3);
+  min-height: 40px; padding: var(--sp-2) var(--sp-3);
+  border-radius: 8px; cursor: pointer;
+}
+.cmdk-item-title { color: var(--ink); font-size: var(--t-body); font-weight: 550; }
+.cmdk-item-hint { color: var(--ink-3); font-size: var(--t-small); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.cmdk-item.is-active {
+  background: color-mix(in srgb, var(--accent-fill) 12%, transparent);
+}
+.cmdk-item.is-active .cmdk-item-title { color: var(--accent); }
+.cmdk-empty { padding: var(--sp-5); text-align: center; color: var(--ink-3);
+  font-size: var(--t-small); }
+.cmdk-hint {
+  display: flex; gap: var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
+  border-top: 1px solid var(--line-soft);
+  color: var(--ink-3); font-size: var(--t-micro);
+  flex-shrink: 0;
+}
+.cmdk-hint kbd {
+  font-size: var(--t-micro); padding: 1px 5px; margin-right: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cmdk-item { transition: background 0.1s ease; }
 }
