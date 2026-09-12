@@ -11,6 +11,7 @@
        wifi off, and an unreachable script would leave the worklist saying
        "loading" forever. -->
   <script src="/static/vendor/htmx-2.0.4.min.js" defer></script>
+  <script src="/static/js/command-palette.js" defer></script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -32,6 +33,14 @@
       </button>
     </nav>
     <div class="identity">
+      <button class="cmdk-trigger" id="cmdk-trigger" type="button" title="Search (Ctrl K)">
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <span>Search</span>
+        <kbd class="cmdk-trigger-kbd">Ctrl K</kbd>
+      </button>
       <span class="chip" id="dev-session-badge" hidden>dev auto-signin</span>
       <span class="who" id="whoami">Not signed in</span>
       <a href="/console/login" id="signin-link">Sign in</a>

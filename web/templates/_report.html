@@ -66,17 +66,25 @@
         <div class="card-head"><h2>Coded fields</h2>
           <span class="hint">A partial field set, plus where this record came from — Smit's parser extracts the rest</span></div>
         <div class="card-body">
-          <dl class="fields">
-          {% for section, fields in r.coded.items() %}
-            {% if fields is mapping %}
-              {% for path, value in fields.items() %}
-                <dt>{{ section }}.{{ path }}</dt><dd>{{ value }}</dd>
-              {% endfor %}
-            {% else %}
-              <dt>{{ section }}</dt><dd>{{ fields }}</dd>
-            {% endif %}
-          {% endfor %}
-          </dl>
+          <!-- Progressive disclosure: raw coded fields are reference detail, not the
+               thing an analyst reads first — same pattern as "What each term means"
+               below. Closed by default so the narrative and hazards stay the focal
+               point; the field count in the summary tells the reader there's
+               something behind it before they open it. -->
+          <details class="explain">
+            <summary>View coded fields ({{ r.coded.items()|length }} section{{ "" if r.coded.items()|length == 1 else "s" }})</summary>
+            <dl class="fields" style="margin-top:var(--sp-2)">
+            {% for section, fields in r.coded.items() %}
+              {% if fields is mapping %}
+                {% for path, value in fields.items() %}
+                  <dt>{{ section }}.{{ path }}</dt><dd>{{ value }}</dd>
+                {% endfor %}
+              {% else %}
+                <dt>{{ section }}</dt><dd>{{ fields }}</dd>
+              {% endif %}
+            {% endfor %}
+            </dl>
+          </details>
         </div>
       </section>
       {% endif %}
