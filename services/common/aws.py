@@ -20,6 +20,18 @@ def s3():
     )
 
 
+def s3_presign():
+    """Sign browser requests against the public endpoint; internal I/O stays on s3()."""
+    s = get_settings()
+    if not s.s3_public_endpoint_url:
+        return s3()
+    return boto3.client(
+        "s3",
+        endpoint_url=s.s3_public_endpoint_url,
+        region_name=s.aws_region,
+    )
+
+
 def sqs():
     s = get_settings()
     return boto3.client(
