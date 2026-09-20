@@ -486,6 +486,50 @@ docs/          measurements.md — every number, dated, with the command that pr
 
 ---
 
+## Cloud deployment (GCP) — where M2 actually runs
+
+**Note on architecture:** the M2 milestone bar below still reads "Everything on AWS"
+(RDS, S3, SQS, Fargate, ALB) from the original plan. That's not what's deployed. The team
+decided against AWS, and M2 is live on **Google Cloud** instead, on a single Compute Engine
+VM running the same `docker-compose.yml` used locally — no ECS/Fargate, no ALB, no managed
+RDS/SQS. This section documents what's actually running so the gap is visible rather than
+silently outdated.
+
+| | |
+|---|---|
+| **Project** | `occurrence-desk-2893` |
+| **VM** | `occurrence-desk-vm` — Compute Engine, `e2-small`, `us-central1-a` |
+| **Stack** | the repo's own `docker-compose.yml` (api · worker · db/Postgres · minio · elasticmq), unmodified from local |
+| **Access** | firewall rule `allow-team-ssh-and-app-v4`, source ranges scoped to named team `/32` IPs only — never `0.0.0.0/0` |
+| **Budget** | $50/month cap, alerts at 20% ($10) / 50% ($25) / 100% ($50), emailed to billing admins |
+
+**What moved, going from a laptop to this VM:**
+
+- Services rebind `0.0.0.0` instead of `127.0.0.1`, so the VM's public IP — not just
+  localhost — can reach them.
+- The S3-compatible endpoint splits in two: one for server-to-server calls (internal
+  Docker network) and one for browser-facing presigned URLs (the VM's public IP).
+- The firewall allowlist has to track whoever's actually connecting — it was edited live
+  this session after a teammate's egress IP wasn't in either allowed range and the console
+  was simply unreachable (not an app bug).
+
+**Bug found and fixed on this deployment:** the upload page hashes files client-side
+(`crypto.subtle.digest`) before requesting a presigned URL, so the API never sees raw
+bytes. `SubtleCrypto` is only exposed in a secure context (`https://` or
+`http://localhost`) — the console reached over plain `http://<VM-IP>:8000` is correctly
+treated as insecure by every browser, so hashing silently threw before any request ever
+left the browser, and nothing ever reached the API or MinIO. Fixed with a dependency-free
+SHA-256 fallback used automatically whenever `window.crypto.subtle` is unavailable, so
+hashing stays entirely client-side regardless of scheme. Full writeup:
+`Occurrence-Desk-Problem-Fix-Log.docx`.
+
+**Verified live**, not just via `/healthz`: a real ACN-formatted report PDF uploaded
+through the public console at `http://<VM-IP>:8000` appeared ranked in the worklist with
+its hazard tags, confirming the whole upload → queue → parse → worklist path over the
+public network, not just inside the VM.
+
+---
+
 ## Milestones
 
 | | Weeks | The bar | State |
