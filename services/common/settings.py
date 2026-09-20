@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://occdesk:occdesk@localhost:5432/occdesk"
 
     s3_endpoint_url: str | None = None  # empty on AWS
+    s3_public_endpoint_url: str | None = None  # browser-facing host for presigned URLs; falls back to s3_endpoint_url
     s3_bucket: str = "occdesk-dev-docs"
 
     sqs_endpoint_url: str | None = None  # empty on AWS
