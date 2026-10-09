@@ -8,7 +8,7 @@ Tracked against the course milestone schedule (M1–M6). Status below reflects a
 |---|---|---|---|
 | M1 — Working Local App | Full local stack running end-to-end | Sep 13 | ✅ Done |
 | M2 — Platform Setup & Lift-and-Shift | Move off laptop onto a real cloud VM, with budget guardrails | Sep 20 | ✅ Done |
-| M3 — Containerize & Deploy | Harden the deploy: real container orchestration, CI/CD | Oct 4 | ⬜ Not started |
+| M3 — Containerize & Deploy | Harden the deploy: real container orchestration, CI/CD | Oct 4 | ✅ Done |
 | M4 — Decouple State | Move state (DB, object storage, queue) off the single VM | Oct 18 | ⬜ Not started |
 | M5 — Orchestrate & Expose | Orchestration + public-facing service exposure | Oct 25 | ⬜ Not started |
 | Step 11 — Checkpoint (ungraded) | Progress check-in | Nov 1 | ⬜ Not started |
@@ -35,9 +35,17 @@ Tracked against the course milestone schedule (M1–M6). Status below reflects a
 - Budget guardrails: $50/mo budget with alert thresholds at 20% / 50% / 100%, plus an automated rule that shuts down billable resources at 30% of the linked $300 credit.
 - Automated billing digest (in progress): scheduled cost email via the Gmail API so spend is visible without checking the console.
 
-## M3 — Containerize & Deploy ⬜
+## M3 — Containerize & Deploy ✅
 
-Not started. Scope: move from a single Compose stack on one VM to a real container-orchestration deploy (build/push images to a registry, CI/CD pipeline for deploys, health-checked rollouts) rather than SSH + `docker compose up`.
+- Multi-stage Dockerfiles for the API and worker (`infra/docker/api.Dockerfile`, `infra/docker/worker.Dockerfile`), built for `linux/amd64`, with no `.env` baked into either image.
+- `requirements.txt` split into `requirements-api.txt` and `requirements-worker.txt`. The API image dropped from 461 MB of installed dependencies to 155 MB. The API image is 407 MB and the worker image is 777 MB.
+- `.dockerignore` excludes secrets, `.git`, caches, local data, and test fixtures.
+- Images pushed to Artifact Registry (`us-central1`, tag `v1`) and deployed on the VM with `docker pull` + `docker compose`, with no install step on the VM.
+- Fixed a worker import that needed `httpx`, found while testing on the VM.
+
+**Not in the repo yet:** the M3 scope also named a CI/CD pipeline and health-checked rollouts. No `.github/` workflow exists in this repo, so treat those as open.
+
+Submission record: `Group4_M3/` (deck, written analysis, demo video, screenshots).
 
 ## M4 — Decouple State ⬜
 

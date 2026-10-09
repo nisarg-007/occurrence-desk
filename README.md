@@ -8,7 +8,7 @@
 [![Lint](https://img.shields.io/badge/ruff-clean-brightgreen)](#accuracy--performance)
 [![License](https://img.shields.io/github/license/nisarg-007/occurrence-desk)](LICENSE)
 [![Stack](https://img.shields.io/badge/stack-FastAPI%20%7C%20Postgres%2016%20%7C%20Python%203.12-065A82)](#architecture)
-[![Roadmap](https://img.shields.io/badge/roadmap-M2%20of%20M6%20done-FDBB2D)](ROADMAP.md)
+[![Roadmap](https://img.shields.io/badge/roadmap-M3%20of%20M6%20done-FDBB2D)](ROADMAP.md)
 
 [Quick Start](#quick-start) • [Why it exists](#why-it-exists) • [Architecture](#architecture) • [Accuracy](#accuracy--performance) • [Roadmap](ROADMAP.md) • [FAQ](#faq)
 
@@ -76,7 +76,7 @@ ASRS (NASA Aviation Safety Reporting System), BTS, NTSB.
 
 ## Roadmap
 
-Full milestone-by-milestone status — what's actually done vs. planned — lives in [ROADMAP.md](ROADMAP.md). Short version: local app and cloud lift-and-shift are both done; containerized orchestration, state decoupling, and observability/automation are next.
+Full milestone-by-milestone status — what's actually done vs. planned — lives in [ROADMAP.md](ROADMAP.md). Short version: local app, cloud lift-and-shift, and containerization are done; state decoupling, orchestration, and observability/automation are next.
 
 ## FAQ
 
@@ -87,7 +87,7 @@ No. It triages *reports* people already filed — it doesn't predict incidents.
 Because an analyst deciding what to act on first needs to trust the ranking, not just receive it. Every score has a `/why` breakdown.
 
 **Is it production-hardened yet?**
-Not yet — see [ROADMAP.md](ROADMAP.md). M1 (local) and M2 (cloud lift-and-shift + budget guardrails) are done; containerization/orchestration/observability are still ahead.
+Not yet — see [ROADMAP.md](ROADMAP.md). M1 (local), M2 (cloud lift-and-shift + budget guardrails), and M3 (containerization) are done; state decoupling, orchestration, and observability are still ahead.
 
 **Can I use my own report data?**
 Yes — the ingestion path doesn't assume ASRS specifically, though the current accuracy numbers are measured against ASRS-formatted reports.
