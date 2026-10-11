@@ -10,6 +10,8 @@ import boto3
 from botocore.config import Config
 from sqlalchemy import create_engine, text
 
+from services.common.settings import get_settings
+
 
 def client(service):
     endpoint = os.environ[f"{service.upper()}_ENDPOINT_URL"]
@@ -26,7 +28,7 @@ def client(service):
 
 
 def database():
-    engine = create_engine(os.environ["DATABASE_URL"], connect_args={"connect_timeout": 3})
+    engine = create_engine(get_settings().database_url, connect_args={"connect_timeout": 3})
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
@@ -37,7 +39,8 @@ def database():
 def check(kind):
     if kind in ("dependencies", "api"):
         database()
-        client("s3").list_buckets()
+        if get_settings().storage_backend == "s3":  # GCS is exercised by a real upload instead
+            client("s3").list_buckets()
         client("sqs").list_queues()
     if kind == "api":
         with urllib.request.urlopen("http://127.0.0.1:8000/healthz", timeout=3) as response:

@@ -1,0 +1,51 @@
+# M4 production stack for the VM. State lives off the VM except the queue:
+#   database  -> Cloud SQL (private IP), connection string read from Secret Manager
+#   uploads   -> GCS bucket, signed and read as the VM service account (no key files)
+#   queue     -> ElasticMQ container from the M3 stack (still on the VM, see the written analysis)
+# No secret appears here or in the image. AWS_* below are placeholders ElasticMQ ignores.
+name: occdesk-m4
+
+x-environment: &environment
+  APP_ENV: prod
+  STORAGE_BACKEND: gcs
+  S3_BUCKET: occdesk-docs-occurrence-desk-2893
+  SECRETS_BACKEND: gcp
+  GCP_PROJECT: occurrence-desk-2893
+  OCCDESK_REPO: sql
+  OCCDESK_WORKER_STORE: sql
+  SQS_ENDPOINT_URL: http://elasticmq:9324
+  SQS_QUEUE_URL: http://elasticmq:9324/000000000000/occdesk-dev-parse
+  SQS_DLQ_URL: http://elasticmq:9324/000000000000/occdesk-dev-parse-dlq
+  AWS_REGION: us-east-1
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: elasticmq
+  AWS_SECRET_ACCESS_KEY: elasticmq
+  AWS_EC2_METADATA_DISABLED: "true"
+  LOG_LEVEL: INFO
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/api.Dockerfile
+      target: runtime
+    image: occdesk-api:m4
+    environment: *environment
+    command: ["python", "-m", "infra.local.api_entry"]
+    ports: ["8000:8000"]
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/worker.Dockerfile
+    image: occdesk-worker:m4
+    environment: *environment
+    init: true
+    stop_grace_period: 60s
+    restart: unless-stopped
+
+networks:
+  default:
+    name: occurrence-desk_default
+    external: true
