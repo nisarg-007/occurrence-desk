@@ -22,7 +22,7 @@ remote() { g compute ssh "$VM" --zone "$ZONE" --command "$1"; }
 case "${1:-}" in
 build)
   TAR="$(mktemp -t occdesk-src).tgz"
-  tar -C "$ROOT" --exclude=.git --exclude=.venv --exclude='.env*' --exclude=data \
+  COPYFILE_DISABLE=1 tar -C "$ROOT" --exclude=.git --exclude=.venv --exclude='.env*' --exclude=data \
     --exclude=tests/e2e/fixtures --exclude=__pycache__ --exclude=.pytest_cache \
     --exclude=.ruff_cache --exclude=.mypy_cache -czf "$TAR" .
   g compute scp "$TAR" "$VM:/tmp/occdesk-src.tgz" --zone "$ZONE"
