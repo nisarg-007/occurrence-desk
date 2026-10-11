@@ -9,7 +9,7 @@ Tracked against the course milestone schedule (M1–M6). Status below reflects a
 | M1 — Working Local App | Full local stack running end-to-end | Sep 13 | ✅ Done |
 | M2 — Platform Setup & Lift-and-Shift | Move off laptop onto a real cloud VM, with budget guardrails | Sep 20 | ✅ Done |
 | M3 — Containerize & Deploy | Harden the deploy: real container orchestration, CI/CD | Oct 4 | ✅ Done |
-| M4 — Decouple State | Move state (DB, object storage, queue) off the single VM | Oct 18 | ⬜ Not started |
+| M4 — Decouple State | Move state (DB, object storage, secrets) off the single VM | Oct 18 | ✅ Done (queue still on the VM) |
 | M5 — Orchestrate & Expose | Orchestration + public-facing service exposure | Oct 25 | ⬜ Not started |
 | Step 11 — Checkpoint (ungraded) | Progress check-in | Nov 1 | ⬜ Not started |
 | M6 — Observe & Automate (Final) | Observability, automation, final demo | Nov 8 | ⬜ Not started |
@@ -47,9 +47,19 @@ Tracked against the course milestone schedule (M1–M6). Status below reflects a
 
 Submission record: `Group4_M3/` (deck, written analysis, demo video, screenshots).
 
-## M4 — Decouple State ⬜
+## M4 — Decouple State ✅
 
-Not started. Scope: move Postgres, object storage (currently MinIO on the same VM), and the queue (currently ElasticMQ on the same VM) to managed or at least externally-hosted services, so the app VM(s) become stateless and disposable.
+- **Database:** Cloud SQL `occdesk-pg` (PostgreSQL 16, `db-f1-micro`, 10 GB SSD) with a **private IP only** (192.168.64.3, public IP disabled) and daily backups. Tables are created by the Alembic migrations in `db/alembic/versions/` (0001 initial schema, 0002 linkage weights). Old vs new row counts match: 265 = 265 across all 14 tables.
+- **Uploads:** a private Cloud Storage bucket (`occdesk-docs-occurrence-desk-2893`, public access prevented). The API signs browser uploads as the VM's service account and the worker reads objects with the same identity, with no key files (`services/common/storage.py`, `STORAGE_BACKEND=gcs`; MinIO stays the local default).
+- **Secrets:** the database URL and JWT secret live in Secret Manager and are read at startup (`services/common/secrets.py`, `SECRETS_BACKEND=gcp`). The running containers contain no `.env` file and no `DATABASE_URL` or `JWT_SECRET` in their environment. Outside local mode the app refuses to start with the default JWT secret.
+- **Deployment:** `ops/vm/docker-compose.m4.yml` runs the API and worker; `ops/m4-deploy-vm.sh` builds the images on the VM and cuts over.
+- **IAM:** the VM's service account holds Secret Manager Secret Accessor and Service Account Token Creator (on itself) in addition to the default project-wide Editor role.
+
+**Still on the VM:** the queue. ElasticMQ runs in a container with its data in a volume on the VM's disk, so deleting the VM would lose waiting jobs, and the app is down until a new VM is built. Moving the queue to a managed service means changing the queue client code and is not done.
+
+**Also open:** the AI chat key and the Slack webhook URL are not yet in Secret Manager, so those two optional features are off in the M4 stack (secret names `occdesk-ai-chat-key` and `occdesk-webhook-url` are already read if they exist).
+
+Submission record: `Group4_M4/` (deck, written analysis, demo video, screenshots).
 
 ## M5 — Orchestrate & Expose ⬜
 

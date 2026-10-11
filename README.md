@@ -8,7 +8,7 @@
 [![Lint](https://img.shields.io/badge/ruff-clean-brightgreen)](#accuracy--performance)
 [![License](https://img.shields.io/github/license/nisarg-007/occurrence-desk)](LICENSE)
 [![Stack](https://img.shields.io/badge/stack-FastAPI%20%7C%20Postgres%2016%20%7C%20Python%203.12-065A82)](#architecture)
-[![Roadmap](https://img.shields.io/badge/roadmap-M3%20of%20M6%20done-FDBB2D)](ROADMAP.md)
+[![Roadmap](https://img.shields.io/badge/roadmap-M4%20of%20M6%20done-FDBB2D)](ROADMAP.md)
 
 [Quick Start](#quick-start) • [Why it exists](#why-it-exists) • [Architecture](#architecture) • [Accuracy](#accuracy--performance) • [Roadmap](ROADMAP.md) • [FAQ](#faq)
 
@@ -50,11 +50,34 @@ flowchart LR
 | Layer | Choice |
 |---|---|
 | API | FastAPI, Python 3.12 |
-| Database | PostgreSQL 16 |
-| Object storage | S3-compatible (MinIO locally) |
+| Database | PostgreSQL 16 (Cloud SQL, private IP only, in the cloud deployment) |
+| Object storage | S3-compatible (MinIO locally); Cloud Storage via the VM's service account in the cloud |
 | Queue | SQS-compatible (ElasticMQ locally) |
 | Console | Jinja2 + HTMX, server-rendered |
+| Secrets | Environment variables locally; Secret Manager in the cloud |
 | Deployment | GCE VM (Docker Compose), see [ROADMAP.md](ROADMAP.md) for what's next |
+
+## Repository layout
+
+```text
+services/
+  api/            FastAPI app: routers, ranking, auth, console routes
+  worker/         PDF parser, hazard classifier, queue consumer
+  common/         settings, aws.py (S3/SQS clients), storage.py (S3 or GCS), secrets.py (Secret Manager)
+db/
+  alembic/        migrations (0001 initial schema, 0002 linkage weights)
+  seed/           reference-data and fixture-user seeders
+  rowcounts.py    exact per-table row counts, for comparing two databases
+web/              Jinja2 templates and static assets for the analyst console
+infra/
+  docker/         api and worker Dockerfiles
+  local/          local Docker Compose helpers (health checks, bootstrap, manage.py)
+ops/
+  vm/docker-compose.m4.yml   production stack on the VM (Cloud SQL, bucket, Secret Manager)
+  m4-*.sh, m4_*.py           M4 scripts: Cloud SQL setup, data copy, VM scope, deploy, upload smoke test
+tests/            unit, contract, integration, e2e, bench
+docs/ eval/       sample ASRS reports and accuracy evaluation
+```
 
 ## Accuracy & performance
 
@@ -87,7 +110,7 @@ No. It triages *reports* people already filed — it doesn't predict incidents.
 Because an analyst deciding what to act on first needs to trust the ranking, not just receive it. Every score has a `/why` breakdown.
 
 **Is it production-hardened yet?**
-Not yet — see [ROADMAP.md](ROADMAP.md). M1 (local), M2 (cloud lift-and-shift + budget guardrails), and M3 (containerization) are done; state decoupling, orchestration, and observability are still ahead.
+Not yet — see [ROADMAP.md](ROADMAP.md). M1 (local), M2 (cloud lift-and-shift + budget guardrails), M3 (containerization), and M4 (database, uploads and secrets moved off the VM) are done; the queue is still on the VM, and orchestration and observability are still ahead.
 
 **Can I use my own report data?**
 Yes — the ingestion path doesn't assume ASRS specifically, though the current accuracy numbers are measured against ASRS-formatted reports.
