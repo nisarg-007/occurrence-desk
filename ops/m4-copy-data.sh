@@ -29,8 +29,15 @@ counts() {
 echo "Copying: ${TABLES[*]}"
 ARGS=()
 for t in "${TABLES[@]}"; do ARGS+=(--table="$t"); done
-sudo docker exec "$OLD" pg_dump -U occdesk -d occdesk --data-only --disable-triggers \
-  "${ARGS[@]}" | new_psql -q
+JOINED="$(IFS=,; echo "${TABLES[*]}")"
+# One transaction: either every table is copied or none is. TRUNCATE makes a re-run safe.
+# No --disable-triggers: Cloud SQL users are not real superusers, and pg_dump orders the data
+# so parents load before children.
+{
+  echo "BEGIN; TRUNCATE $JOINED RESTART IDENTITY CASCADE;"
+  sudo docker exec "$OLD" pg_dump -U occdesk -d occdesk --data-only "${ARGS[@]}"
+  echo "COMMIT;"
+} | new_psql -q -o /dev/null
 
 echo "--- sequences"
 # Keep id sequences ahead of the copied rows so the next insert does not collide.

@@ -26,15 +26,19 @@ g sql users set-password occdesk --instance="$INSTANCE" --password="$PW" >/dev/n
 printf '%s' "postgresql+psycopg://occdesk:${PW}@${IP}:5432/occdesk" |
   g secrets versions add occdesk-database-url --data-file=- >/dev/null
 
+cleanup() {
+  echo "4/4 Clean up the VM"
+  g compute ssh "$VM" --zone "$ZONE" --command 'rm -f /dev/shm/m4url /tmp/m4-copy-data.sh' || true
+}
+trap cleanup EXIT
+
 echo "2/4 Stage the copy script and connection string on the VM"
 g compute scp "$HERE/m4-copy-data.sh" "$VM:/tmp/m4-copy-data.sh" --zone "$ZONE" >/dev/null
 printf '%s\n' "postgresql://occdesk:${PW}@${IP}:5432/occdesk" |
-  g compute ssh "$VM" --zone "$ZONE" --command 'umask 077; cat > /dev/shm/m4url' 2>/dev/null
+  g compute ssh "$VM" --zone "$ZONE" --command 'umask 077; cat > /dev/shm/m4url'
 
 echo "3/4 Copy the data and compare exact row counts (old | new)"
 g compute ssh "$VM" --zone "$ZONE" --command \
-  'CLOUDSQL_URL="$(cat /dev/shm/m4url)" bash /tmp/m4-copy-data.sh' 2>/dev/null
+  'CLOUDSQL_URL="$(cat /dev/shm/m4url)" bash /tmp/m4-copy-data.sh'
 
-echo "4/4 Clean up the VM"
-g compute ssh "$VM" --zone "$ZONE" --command 'rm -f /dev/shm/m4url /tmp/m4-copy-data.sh' 2>/dev/null
 echo "Done."
