@@ -1,5 +1,7 @@
 pydantic-settings==2.7.1
 boto3==1.35.92
+google-cloud-storage==2.19.0
+google-cloud-secret-manager==2.22.0
 sqlalchemy==2.0.36
 psycopg[binary]==3.2.3
 

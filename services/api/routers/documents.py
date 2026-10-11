@@ -24,7 +24,7 @@ from services.api.schemas import (
     UploadUrlResponse,
 )
 from services.api.security import Principal
-from services.common import aws
+from services.common import aws, storage
 from services.common.logging import trace_id_var
 from services.common.settings import Settings
 
@@ -64,15 +64,8 @@ def upload_url(
     # Presigned POST, not PUT: only POST can enforce a size range and content type in the
     # policy, so an oversized file is rejected by S3 itself and never costs us a request,
     # a worker, or a byte of RDS.
-    presigned = aws.s3_public().generate_presigned_post(
-        Bucket=s.s3_bucket,
-        Key=key,
-        Fields={"Content-Type": "application/pdf"},
-        Conditions=[
-            {"Content-Type": "application/pdf"},
-            ["content-length-range", 1, s.max_upload_bytes],
-        ],
-        ExpiresIn=s.presign_expires_seconds,
+    presigned = storage.presign_upload(
+        s.s3_bucket, key, s.max_upload_bytes, s.presign_expires_seconds
     )
     return UploadUrlResponse(
         document_id=doc.id,

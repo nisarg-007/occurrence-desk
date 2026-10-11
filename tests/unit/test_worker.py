@@ -38,9 +38,7 @@ def isolated_state(tmp_path, monkeypatch):
 def fake_infra(monkeypatch):
     fake = FakeSQS()
     monkeypatch.setattr(worker, "sqs", lambda: fake)
-    monkeypatch.setattr(
-        worker, "s3", lambda: type("S3", (), {"download_file": staticmethod(lambda *a: None)})()
-    )
+    monkeypatch.setattr(worker.storage, "download", lambda *a: None)
     monkeypatch.setattr(worker, "predict_hazards", lambda narrative: [])
     return fake
 

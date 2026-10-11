@@ -31,7 +31,8 @@ import tempfile
 import threading
 import time
 
-from services.common.aws import s3, sqs
+from services.common import storage
+from services.common.aws import sqs
 from services.common.logging import trace_id_var
 from services.common.settings import get_settings
 from services.worker import store
@@ -104,7 +105,7 @@ def handle_message(message: dict, queue_url: str) -> None:
     success = False
     try:
         with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
-            s3().download_file(body["s3_bucket"], body["s3_key"], tmp.name)
+            storage.download(body["s3_bucket"], body["s3_key"], tmp.name)
             records = parse_pdf(tmp.name, document_id=document_id)
         for record in records:
             # NASA's own codes are already in record["hazards"] (source='nasa').
