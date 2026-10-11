@@ -79,3 +79,18 @@ def test_get_settings_refuses_the_local_jwt_secret_outside_local(monkeypatch):
             settings_module.get_settings()
     finally:
         settings_module.get_settings.cache_clear()
+
+
+def test_sqs_client_needs_no_aws_env_vars_for_elasticmq(monkeypatch):
+    from services.common import aws
+    from services.common import settings as settings_module
+
+    monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
+    monkeypatch.delenv("AWS_SECRET_ACCESS_KEY", raising=False)
+    monkeypatch.setenv("SQS_ENDPOINT_URL", "http://elasticmq:9324")
+    settings_module.get_settings.cache_clear()
+    try:
+        client = aws.sqs()
+        assert client._request_signer._credentials.access_key == "elasticmq"
+    finally:
+        settings_module.get_settings.cache_clear()

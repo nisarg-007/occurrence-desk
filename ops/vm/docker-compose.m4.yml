@@ -2,7 +2,8 @@
 #   database  -> Cloud SQL (private IP), connection string read from Secret Manager
 #   uploads   -> GCS bucket, signed and read as the VM service account (no key files)
 #   queue     -> ElasticMQ container from the M3 stack (still on the VM, see the written analysis)
-# No secret appears here or in the image. AWS_* below are placeholders ElasticMQ ignores.
+# No secret appears here or in the image, and no AWS_* credentials: the queue client passes
+# a placeholder to ElasticMQ itself (services/common/aws.py).
 name: occdesk-m4
 
 x-environment: &environment
@@ -18,8 +19,6 @@ x-environment: &environment
   SQS_DLQ_URL: http://elasticmq:9324/000000000000/occdesk-dev-parse-dlq
   AWS_REGION: us-east-1
   AWS_DEFAULT_REGION: us-east-1
-  AWS_ACCESS_KEY_ID: elasticmq
-  AWS_SECRET_ACCESS_KEY: elasticmq
   AWS_EC2_METADATA_DISABLED: "true"
   LOG_LEVEL: INFO
 

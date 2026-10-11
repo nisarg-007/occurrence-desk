@@ -6,6 +6,8 @@ That is the entire difference between local and cloud.
 
 from __future__ import annotations
 
+import os
+
 import boto3
 
 from services.common.settings import get_settings
@@ -36,8 +38,14 @@ def s3_public():
 
 def sqs():
     s = get_settings()
+    extra = {}
+    if s.sqs_endpoint_url and not os.environ.get("AWS_ACCESS_KEY_ID"):
+        # ElasticMQ ignores credentials, but boto3 will not sign a request without some. Passing
+        # a placeholder here means the deployed containers need no AWS_* variables at all.
+        extra = {"aws_access_key_id": "elasticmq", "aws_secret_access_key": "elasticmq"}
     return boto3.client(
         "sqs",
         endpoint_url=s.sqs_endpoint_url or None,
         region_name=s.aws_region,
+        **extra,
     )

@@ -19,11 +19,15 @@ def client(service):
         ("http://minio:", "http://elasticmq:", "http://localhost:", "http://127.0.0.1:")
     ):
         raise RuntimeError("Local tooling refuses non-local cloud endpoints")
+    extra = {}
+    if service == "sqs" and not os.environ.get("AWS_ACCESS_KEY_ID"):
+        extra = {"aws_access_key_id": "elasticmq", "aws_secret_access_key": "elasticmq"}
     return boto3.client(
         service,
         endpoint_url=endpoint,
         region_name="us-east-1",
         config=Config(connect_timeout=2, read_timeout=3, retries={"max_attempts": 0}),
+        **extra,
     )
 
 
