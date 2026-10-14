@@ -38,11 +38,11 @@ The design principle driving the API is stated in the code, not just here: accep
 ```mermaid
 flowchart LR
     U[Analyst Console<br/>HTMX + server-rendered] -->|upload| A[FastAPI]
-    A -->|presigned POST| S[(S3-compatible<br/>MinIO)]
+    A -->|presigned POST| S[(Object storage<br/>MinIO locally, GCS in the cloud)]
     A -->|202 Accepted| U
     A -->|enqueue| Q[(SQS-compatible<br/>ElasticMQ)]
     Q --> W[Worker]
-    W -->|extract + rank| D[(Postgres 16)]
+    W -->|extract + rank| D[(Postgres 16<br/>Cloud SQL in the cloud)]
     D -->|/why explainability| A
     A -->|/healthz /readyz /metrics| M[Prometheus]
 ```
@@ -99,7 +99,7 @@ ASRS (NASA Aviation Safety Reporting System), BTS, NTSB.
 
 ## Roadmap
 
-Full milestone-by-milestone status — what's actually done vs. planned — lives in [ROADMAP.md](ROADMAP.md). Short version: local app, cloud lift-and-shift, and containerization are done; state decoupling, orchestration, and observability/automation are next.
+Full milestone-by-milestone status — what's actually done vs. planned — lives in [ROADMAP.md](ROADMAP.md). Short version: local app, cloud lift-and-shift, containerization, and state decoupling (database, uploads, secrets) are done; the queue is still on the VM, and orchestration and observability/automation are next.
 
 ## FAQ
 
