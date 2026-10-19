@@ -1,0 +1,60 @@
+# Autoscaler and disruption budgets.
+#
+# HPA: scales the api between 2 and 6 replicas on CPU (50% of the 250m request).
+# PDB: during a node drain / upgrade, Kubernetes may evict only as many pods as the budget allows.
+#      Without it, a drain can evict BOTH replicas at once while the load balancer is still routing
+#      to them -> intermittent 502/503 for users until replacements become Ready.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: occdesk-api
+  namespace: occdesk
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: occdesk-api
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 120   # shortened from the 300s default so scale-in is visible in a demo
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: occdesk-api
+  namespace: occdesk
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: occdesk-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: occdesk-worker
+  namespace: occdesk
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: occdesk-worker

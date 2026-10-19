@@ -1,0 +1,85 @@
+# Service + HTTPS global load balancer (GKE Ingress) with a Google-managed certificate.
+#
+#   client -> global external HTTPS LB (static IP, managed cert) -> Ingress -> Service (NEG) -> pods
+#   http://  -> 301 -> https://   (FrontendConfig, enforced at the load balancer, not in the app)
+apiVersion: v1
+kind: Service
+metadata:
+  name: occdesk-api
+  namespace: occdesk
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'     # container-native LB: the LB talks to pod IPs directly
+    cloud.google.com/backend-config: '{"default": "occdesk-api"}'
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: occdesk-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: occdesk-api
+  namespace: occdesk
+spec:
+  healthCheck:
+    type: HTTP
+    requestPath: /readyz      # same contract as the readiness probe
+    port: 8000
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 2
+  connectionDraining:
+    drainingTimeoutSec: 30    # in-flight requests finish when a pod is removed
+  timeoutSec: 60
+---
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: occdesk-frontend
+  namespace: occdesk
+spec:
+  redirectToHttps:
+    enabled: true
+    responseCodeName: MOVED_PERMANENTLY_DEFAULT   # 301
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: occdesk-cert
+  namespace: occdesk
+spec:
+  domains:
+    - ${APP_HOSTNAME}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: occdesk
+  namespace: occdesk
+  annotations:
+    kubernetes.io/ingress.class: gce
+    kubernetes.io/ingress.global-static-ip-name: ${STATIC_IP_NAME}
+    networking.gke.io/managed-certificates: occdesk-cert
+    networking.gke.io/v1beta1.FrontendConfig: occdesk-frontend
+spec:
+  defaultBackend:
+    service:
+      name: occdesk-api
+      port:
+        number: 80
+  rules:
+    - host: ${APP_HOSTNAME}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: occdesk-api
+                port:
+                  number: 80

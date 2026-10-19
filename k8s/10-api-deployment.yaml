@@ -1,0 +1,94 @@
+# API: stateless, two replicas minimum, spread across nodes and zones.
+#
+# Probe design (see docs in ROADMAP/M5):
+#   startup   /healthz  gives a slow first boot (Secret Manager fetch, imports) time without being killed
+#   liveness  /healthz  checks NOTHING downstream: "is this process answering at all?" A database blip must
+#                       never make Kubernetes restart healthy pods in a loop.
+#   readiness /readyz   also checks the database and the queue: "can this pod serve a request right now?"
+#                       A failing pod is pulled out of the load balancer but is NOT restarted.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: occdesk-api
+  namespace: occdesk
+  labels: &labels
+    app.kubernetes.io/name: occdesk-api
+    app.kubernetes.io/part-of: occurrence-desk
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: occdesk-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0   # never drop below the desired count during a rollout
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      serviceAccountName: occdesk
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: occdesk-api
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: occdesk-api
+      containers:
+        - name: api
+          image: ${REGISTRY}/api:${IMAGE_TAG}
+          command: ["python", "-m", "infra.local.api_entry"]
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: occdesk-config
+          resources:
+            requests:
+              cpu: 250m
+              memory: 384Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          startupProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 3
+            failureThreshold: 30     # up to 90s to boot
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 2
+          lifecycle:
+            preStop:
+              # Keep serving while the load balancer finishes removing this pod, then let uvicorn
+              # drain on SIGTERM. Without this, in-flight and newly routed requests get 502s.
+              exec:
+                command: ["sleep", "15"]

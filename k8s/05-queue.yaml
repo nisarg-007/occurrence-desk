@@ -1,0 +1,95 @@
+# ElasticMQ (SQS-compatible) inside the cluster. The M4 queue on the VM listens on 127.0.0.1 only, so pods
+# could not reach it; running it here also lets the VM be retired.
+#
+# Single replica by design: ElasticMQ keeps its queues in memory, so two replicas would be two separate
+# queues. Messages in flight are lost if this pod restarts (the same was true of the VM container); the
+# upload path is idempotent (unique documents.sha256), so a lost message means a re-upload, not corruption.
+# That is why it is not covered by a PodDisruptionBudget: minAvailable 1 on one replica would block node
+# drains forever. Moving to a managed queue (Pub/Sub) is the follow-up.
+#
+# The queues and their settings mirror infra/local/bootstrap.py, declared up front so no bootstrap job is needed.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticmq-config
+  namespace: occdesk
+data:
+  elasticmq.conf: |
+    include classpath("application.conf")
+    node-address { protocol = http, host = "*", port = 9324, context-path = "" }
+    rest-sqs { enabled = true, bind-port = 9324, bind-hostname = "0.0.0.0" }
+    aws { region = "us-east-1", accountId = "000000000000" }
+    queues {
+      occdesk-dev-parse-dlq { }
+      occdesk-dev-parse {
+        defaultVisibilityTimeout = 300 seconds
+        receiveMessageWait = 20 seconds
+        deadLettersQueue { name = "occdesk-dev-parse-dlq", maxReceiveCount = 3 }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elasticmq
+  namespace: occdesk
+  labels: &labels
+    app.kubernetes.io/name: elasticmq
+    app.kubernetes.io/part-of: occurrence-desk
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate   # never run two queues side by side during a rollout
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: elasticmq
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      containers:
+        - name: elasticmq
+          image: softwaremill/elasticmq:1.6.15
+          ports:
+            - name: sqs
+              containerPort: 9324
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 768Mi
+          volumeMounts:
+            - name: config
+              mountPath: /opt/elasticmq.conf
+              subPath: elasticmq.conf
+          startupProbe:
+            tcpSocket: {port: sqs}
+            periodSeconds: 3
+            failureThreshold: 30
+          livenessProbe:
+            tcpSocket: {port: sqs}
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket: {port: sqs}
+            periodSeconds: 5
+      volumes:
+        - name: config
+          configMap:
+            name: elasticmq-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticmq
+  namespace: occdesk
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: elasticmq
+  ports:
+    - name: sqs
+      port: 9324
+      targetPort: sqs

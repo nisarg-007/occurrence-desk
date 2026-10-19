@@ -1,0 +1,38 @@
+# Namespace, workload identity and shared configuration.
+# ${VARS} are filled in by ops/m5-deploy.sh (envsubst); nothing secret lives here.
+# Secrets (database URL, JWT secret) are read from Secret Manager at startup (SECRETS_BACKEND=gcp).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: occdesk
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: occdesk
+  namespace: occdesk
+  annotations:
+    # Workload Identity: pods act as this Google service account, so there are no key files.
+    iam.gke.io/gcp-service-account: ${GSA_EMAIL}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: occdesk-config
+  namespace: occdesk
+data:
+  APP_ENV: prod
+  APP_VERSION: "${IMAGE_TAG}"
+  STORAGE_BACKEND: gcs
+  S3_BUCKET: ${BUCKET}
+  SECRETS_BACKEND: gcp
+  GCP_PROJECT: ${PROJECT_ID}
+  OCCDESK_REPO: sql
+  OCCDESK_WORKER_STORE: sql
+  SQS_ENDPOINT_URL: http://elasticmq:9324
+  SQS_QUEUE_URL: http://elasticmq:9324/000000000000/occdesk-dev-parse
+  SQS_DLQ_URL: http://elasticmq:9324/000000000000/occdesk-dev-parse-dlq
+  AWS_REGION: us-east-1
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_EC2_METADATA_DISABLED: "true"
+  LOG_LEVEL: INFO
