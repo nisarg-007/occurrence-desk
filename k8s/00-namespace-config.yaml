@@ -29,6 +29,10 @@ data:
   GCP_PROJECT: ${PROJECT_ID}
   OCCDESK_REPO: sql
   OCCDESK_WORKER_STORE: sql
+  # Cloud SQL is db-f1-micro (~25 connections) and every replica has its own pool: with up to 6 api
+  # pods + 2 workers, 2 connections each (+1 for the readiness check) stays under the limit.
+  DB_POOL_SIZE: "2"
+  DB_MAX_OVERFLOW: "0"
   SQS_ENDPOINT_URL: http://elasticmq:9324
   SQS_QUEUE_URL: http://elasticmq:9324/000000000000/occdesk-dev-parse
   SQS_DLQ_URL: http://elasticmq:9324/000000000000/occdesk-dev-parse-dlq

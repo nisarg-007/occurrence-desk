@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     app_version: str = "dev"  # set to the git SHA at build time; never "latest"
 
     database_url: str = "postgresql+psycopg://occdesk:occdesk@localhost:5432/occdesk"
+    # Per-process pool. Defaults suit one process; on Kubernetes every replica gets its own pool, so
+    # replicas x (pool + overflow) must stay under the database's max_connections (f1-micro: ~25).
+    db_pool_size: int = 5
+    db_max_overflow: int = 2
 
     storage_backend: str = "s3"  # "s3" (MinIO / AWS S3) or "gcs" (Google Cloud Storage via the VM service account)
     secrets_backend: str = "env"  # "env" or "gcp" (Secret Manager, see services/common/secrets.py)

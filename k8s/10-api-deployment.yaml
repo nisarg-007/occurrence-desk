@@ -46,7 +46,7 @@ spec:
               app.kubernetes.io/name: occdesk-api
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: ScheduleAnyway
+          whenUnsatisfiable: DoNotSchedule   # replicas must land on different nodes (Autopilot adds one)
           labelSelector:
             matchLabels:
               app.kubernetes.io/name: occdesk-api

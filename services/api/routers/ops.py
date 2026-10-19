@@ -6,6 +6,8 @@ query makes ECS kill healthy tasks in a loop.
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from fastapi import APIRouter, Depends, Response
 
 from services.api import metrics
@@ -30,13 +32,31 @@ def readyz(response: Response, s: Settings = Depends(settings)) -> Readiness:
     return Readiness(status="ready" if ready else "not_ready", checks=checks)
 
 
+@lru_cache
+def _readiness_engine(database_url: str):
+    """One single-connection engine per process, reused by every probe.
+
+    Building a new engine per /readyz call leaked a connection each time; with Kubernetes and the
+    load balancer probing every pod every few seconds that exhausted Cloud SQL (db-f1-micro: ~25).
+    """
+    from sqlalchemy import create_engine
+
+    return create_engine(
+        database_url,
+        pool_size=1,
+        max_overflow=0,
+        pool_pre_ping=True,
+        connect_args={"connect_timeout": 3},
+    )
+
+
 def _check_db(s: Settings) -> bool:
     if s.is_local:
         return True  # the M1 stub repository is always available
     try:
-        from sqlalchemy import create_engine, text
+        from sqlalchemy import text
 
-        with create_engine(s.database_url, pool_pre_ping=True).connect() as c:
+        with _readiness_engine(s.database_url).connect() as c:
             c.execute(text("SELECT 1"))
         return True
     except Exception:  # noqa: BLE001 - readiness reports false, it does not raise
