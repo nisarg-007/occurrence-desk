@@ -46,7 +46,7 @@ spec:
               app.kubernetes.io/name: occdesk-api
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: DoNotSchedule   # replicas must land on different nodes (Autopilot adds one)
+          whenUnsatisfiable: ScheduleAnyway  # prefer different nodes; never block scale-out (project SSD quota caps node count)
           labelSelector:
             matchLabels:
               app.kubernetes.io/name: occdesk-api
@@ -63,7 +63,7 @@ spec:
           resources:
             requests:
               cpu: 250m
-              memory: 384Mi
+              memory: 256Mi   # measured use is ~110-140Mi
             limits:
               cpu: 500m
               memory: 512Mi

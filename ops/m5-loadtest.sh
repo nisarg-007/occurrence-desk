@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
-# M5: generate CPU load against the public URL so the HPA adds replicas, and watch it happen.
+# M5: generate CPU load so the HPA adds replicas.
 #
-#   ops/m5-loadtest.sh https://app.example.com [seconds] [parallel]
+#   ops/m5-loadtest.sh [seconds] [threads]      # defaults: 240s, 48 threads
+#   kubectl -n occdesk get hpa,pods -w          # in a second terminal
 #
-# Hits /healthz, which is CPU-cheap per request but cheap enough to fire in volume; the point is to push
-# average CPU over the 50% target. In a second terminal run:  kubectl -n occdesk get hpa,pods -w
+# The load comes from a short-lived pod INSIDE the cluster. A laptop cannot push enough requests through the
+# internet to move CPU past the 50% target; an in-cluster client can. The pod stops by itself when the time is up.
 set -euo pipefail
 
-URL="${1:?usage: $0 https://host [seconds] [parallel]}"
-SECONDS_TOTAL="${2:-180}"
-PARALLEL="${3:-40}"
-END=$((SECONDS + SECONDS_TOTAL))
+KUBECTL="${KUBECTL:-kubectl}"
+DURATION="${1:-240}"
+THREADS="${2:-48}"
 
-echo "load: $PARALLEL workers against $URL/healthz for ${SECONDS_TOTAL}s"
-worker() { while ((SECONDS < END)); do curl -s -o /dev/null "$URL/healthz"; done; }
-for _ in $(seq 1 "$PARALLEL"); do worker & done
-wait
-echo "load finished; replicas scale back in after the HPA stabilization window"
+"$KUBECTL" -n occdesk delete pod loadgen --ignore-not-found --wait=true >/dev/null
+
+"$KUBECTL" -n occdesk run loadgen --image=python:3.12-slim --restart=Never --overrides="$(cat <<EOF
+{"spec":{"containers":[{"name":"loadgen","image":"python:3.12-slim",
+ "resources":{"requests":{"cpu":"500m","memory":"128Mi"}},
+ "command":["python","-c","import threading,time,urllib.request\nend=time.time()+$DURATION\ndef w():\n    while time.time()<end:\n        try: urllib.request.urlopen('http://occdesk-api/healthz',timeout=5).read()\n        except Exception: pass\nfor _ in range($THREADS): threading.Thread(target=w).start()\n"]}]}}
+EOF
+)"
+
+echo "load running for ${DURATION}s with $THREADS threads. Watch:  kubectl -n occdesk get hpa occdesk-api -w"
