@@ -8,7 +8,7 @@
 [![Lint](https://img.shields.io/badge/ruff-clean-brightgreen)](#accuracy--performance)
 [![License](https://img.shields.io/github/license/nisarg-007/occurrence-desk)](LICENSE)
 [![Stack](https://img.shields.io/badge/stack-FastAPI%20%7C%20Postgres%2016%20%7C%20Python%203.12-065A82)](#architecture)
-[![Roadmap](https://img.shields.io/badge/roadmap-M4%20of%20M6%20done-FDBB2D)](ROADMAP.md)
+[![Roadmap](https://img.shields.io/badge/roadmap-M5%20of%20M6%20done-FDBB2D)](ROADMAP.md)
 
 [Quick Start](#quick-start) • [Why it exists](#why-it-exists) • [Architecture](#architecture) • [Accuracy](#accuracy--performance) • [Roadmap](ROADMAP.md) • [FAQ](#faq)
 
@@ -55,7 +55,7 @@ flowchart LR
 | Queue | SQS-compatible (ElasticMQ locally) |
 | Console | Jinja2 + HTMX, server-rendered |
 | Secrets | Environment variables locally; Secret Manager in the cloud |
-| Deployment | GCE VM (Docker Compose), see [ROADMAP.md](ROADMAP.md) for what's next |
+| Deployment | GKE Autopilot behind an HTTPS load balancer (`k8s/`); the M4 GCE VM stack is kept as a fallback. See [ROADMAP.md](ROADMAP.md) |
 
 ## Repository layout
 
@@ -72,7 +72,9 @@ web/              Jinja2 templates and static assets for the analyst console
 infra/
   docker/         api and worker Dockerfiles
   local/          local Docker Compose helpers (health checks, bootstrap, manage.py)
+k8s/              M5 Kubernetes manifests: deployments, service, ingress, autoscaler, PodDisruptionBudgets
 ops/
+  m5-*.sh                    M5 scripts: cluster setup, build and deploy, load test, PDB demo
   vm/docker-compose.m4.yml   production stack on the VM (Cloud SQL, bucket, Secret Manager)
   m4-*.sh, m4_*.py           M4 scripts: Cloud SQL setup, data copy, VM scope, deploy, upload smoke test
 tests/            unit, contract, integration, e2e, bench
@@ -99,7 +101,7 @@ ASRS (NASA Aviation Safety Reporting System), BTS, NTSB.
 
 ## Roadmap
 
-Full milestone-by-milestone status — what's actually done vs. planned — lives in [ROADMAP.md](ROADMAP.md). Short version: local app, cloud lift-and-shift, containerization, and state decoupling (database, uploads, secrets) are done; the queue is still on the VM, and orchestration and observability/automation are next.
+Full milestone-by-milestone status — what's actually done vs. planned — lives in [ROADMAP.md](ROADMAP.md). Short version: local app, cloud lift-and-shift, containerization, state decoupling and orchestration on GKE are done; observability/automation is next.
 
 ## FAQ
 
@@ -110,7 +112,7 @@ No. It triages *reports* people already filed — it doesn't predict incidents.
 Because an analyst deciding what to act on first needs to trust the ranking, not just receive it. Every score has a `/why` breakdown.
 
 **Is it production-hardened yet?**
-Not yet — see [ROADMAP.md](ROADMAP.md). M1 (local), M2 (cloud lift-and-shift + budget guardrails), M3 (containerization), and M4 (database, uploads and secrets moved off the VM) are done; the queue is still on the VM, and orchestration and observability are still ahead.
+Not yet — see [ROADMAP.md](ROADMAP.md). M1 (local), M2 (cloud lift-and-shift + budget guardrails), M3 (containerization), M4 (database, uploads and secrets moved off the VM) and M5 (GKE: replicas, autoscaling, HTTPS) are done; observability is still ahead.
 
 **Can I use my own report data?**
 Yes — the ingestion path doesn't assume ASRS specifically, though the current accuracy numbers are measured against ASRS-formatted reports.

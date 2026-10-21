@@ -9,8 +9,8 @@ Tracked against the course milestone schedule (M1–M6). Status below reflects a
 | M1 — Working Local App | Full local stack running end-to-end | Sep 13 | ✅ Done |
 | M2 — Platform Setup & Lift-and-Shift | Move off laptop onto a real cloud VM, with budget guardrails | Sep 20 | ✅ Done |
 | M3 — Containerize & Deploy | Harden the deploy: real container orchestration, CI/CD | Oct 4 | ✅ Done |
-| M4 — Decouple State | Move state (DB, object storage, secrets) off the single VM | Oct 18 | ✅ Done (queue still on the VM) |
-| M5 — Orchestrate & Expose | Orchestration + public-facing service exposure | Oct 25 | ⬜ Not started |
+| M4 — Decouple State | Move state (DB, object storage, secrets) off the single VM | Oct 18 | ✅ Done (queue was still on the VM; moved into the cluster in M5) |
+| M5 — Orchestrate & Expose | Orchestration + public-facing service exposure | Oct 25 | ✅ Done |
 | Step 11 — Checkpoint (ungraded) | Progress check-in | Nov 1 | ⬜ Not started |
 | M6 — Observe & Automate (Final) | Observability, automation, final demo | Nov 8 | ⬜ Not started |
 
@@ -61,9 +61,17 @@ Submission record: `Group4_M3/` (deck, written analysis, demo video, screenshots
 
 Submission record: `Group4_M4/` (deck, written analysis, demo video, screenshots).
 
-## M5 — Orchestrate & Expose ⬜
+## M5 — Orchestrate & Expose ✅
 
-Not started. Scope: orchestrate the now-stateless services (multiple instances, autoscaling — an autoscaling policy already exists on paper in the team's Queue/Autoscaling/Observability lane but hasn't been deployed) and expose the app behind a real public endpoint (load balancer / managed HTTPS) instead of a bare VM IP and port.
+- GKE Autopilot cluster `occdesk` runs the app as multiple replicas: api (2-6, autoscaled), worker (2) and an in-cluster ElasticMQ queue. Manifests live in `k8s/` (see `k8s/README.md`); setup and deploy scripts are `ops/m5-*.sh`.
+- Public endpoint: a global HTTPS load balancer (static IP, Google-managed certificate) on `https://136-69-123-122.sslip.io`; plain `http://` returns a 301 to `https://`.
+- Two separate health checks: liveness `/healthz` checks only that the process answers; readiness `/readyz` also checks the database and queue, and a failing pod is removed from the load balancer without being restarted.
+- HorizontalPodAutoscaler (CPU 50%, 2-6 replicas) measured at 2 to 6 Ready replicas in about 85 s under load. PodDisruptionBudgets (`minAvailable: 1`) keep an api pod serving during evictions: the same eviction test returned 502 on 30 of 226 requests without the budget and none with it.
+- Fixed while orchestrating: `/readyz` built a new database engine per probe and leaked connections until Cloud SQL (db-f1-micro, ~25 connections) refused new ones; it now reuses one single-connection engine and pool sizes are configurable (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`).
+- Workloads authenticate to GCS and Secret Manager through Workload Identity (no key files).
+- Known limits: the queue is a single in-memory ElasticMQ pod (messages in flight are lost if it restarts; a managed queue is the follow-up); Autopilot may pack replicas onto one node; the project's SSD quota caps how many nodes Google can add.
+
+Submission record: `Group4_M5/`.
 
 ## Step 11 — Checkpoint ⬜
 
