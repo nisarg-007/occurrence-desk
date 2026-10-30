@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Response
 
 from services.api import metrics
 from services.api.deps import settings
+from services.api.problems import ApiProblem
 from services.api.schemas import Health, Readiness
 from services.common import aws
 from services.common.settings import Settings
@@ -53,6 +54,20 @@ def _check_queue(s: Settings) -> bool:
         return True
     except Exception:  # noqa: BLE001
         return False
+
+
+@router.post("/ops/fault", include_in_schema=False)
+def inject_fault(s: Settings = Depends(settings)) -> None:
+    """Controlled 500 for demo: triggers the 5xx counter and log-based metric.
+
+    Disabled in production to prevent abuse. Re-enable temporarily during the live demo
+    by setting ALLOW_FAULT_INJECTION=1 on the container.
+    """
+    import os
+
+    if os.environ.get("ALLOW_FAULT_INJECTION") != "1":
+        raise ApiProblem(403, "Forbidden", "Fault injection disabled")
+    raise ApiProblem(500, "Injected Fault", "Deliberate 500 for observability demo")
 
 
 @router.get("/metrics")

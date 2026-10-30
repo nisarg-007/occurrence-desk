@@ -1,0 +1,159 @@
+name: Build, Deploy & Rollback
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: occurrence-desk-2893
+  ZONE: us-central1-a
+  VM_NAME: occurrence-desk-vm
+  DEPLOY_DIR: /opt/occdesk
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check services/ tests/
+
+      - name: Unit tests
+        run: pytest tests/unit/ tests/contract/ -x -q
+        env:
+          APP_ENV: local
+
+  deploy:
+    name: Deploy to VM
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Get current image tag (for rollback)
+        id: previous
+        run: |
+          PREV=$(gcloud compute ssh ${{ env.VM_NAME }} --zone ${{ env.ZONE }} --command \
+            "sudo docker inspect occdesk-api:current --format='{{index .Config.Labels \"version\"}}' 2>/dev/null || echo none" \
+            -- -o StrictHostKeyChecking=no)
+          echo "tag=${PREV}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload source to VM
+        run: |
+          tar --exclude=.git --exclude=.venv --exclude='.env*' --exclude=data \
+            --exclude=tests/e2e/fixtures --exclude=__pycache__ --exclude=.pytest_cache \
+            --exclude=.ruff_cache --exclude=.mypy_cache -czf /tmp/src.tgz .
+          gcloud compute scp /tmp/src.tgz ${{ env.VM_NAME }}:/tmp/src.tgz --zone ${{ env.ZONE }}
+
+      - name: Build images on VM
+        run: |
+          gcloud compute ssh ${{ env.VM_NAME }} --zone ${{ env.ZONE }} --command "
+            sudo rm -rf ${{ env.DEPLOY_DIR }}/new
+            sudo mkdir -p ${{ env.DEPLOY_DIR }}/new
+            sudo tar -xzf /tmp/src.tgz -C ${{ env.DEPLOY_DIR }}/new
+            rm -f /tmp/src.tgz
+            cd ${{ env.DEPLOY_DIR }}/new
+            sudo docker compose -f ops/vm/docker-compose.m4.yml build \
+              --build-arg APP_VERSION=${{ github.sha }}
+            sudo docker tag occdesk-api:m4 occdesk-api:${{ github.sha }}
+            sudo docker tag occdesk-worker:m4 occdesk-worker:${{ github.sha }}
+          "
+
+      - name: Tag previous as rollback
+        run: |
+          gcloud compute ssh ${{ env.VM_NAME }} --zone ${{ env.ZONE }} --command "
+            sudo docker tag occdesk-api:m4 occdesk-api:rollback 2>/dev/null || true
+            sudo docker tag occdesk-worker:m4 occdesk-worker:rollback 2>/dev/null || true
+          "
+
+      - name: Cut over to new images
+        run: |
+          gcloud compute ssh ${{ env.VM_NAME }} --zone ${{ env.ZONE }} --command "
+            cd ${{ env.DEPLOY_DIR }}/new
+            sudo docker compose -f ops/vm/docker-compose.m4.yml up -d --force-recreate
+          "
+
+      - name: Health check (30 retries, 3s apart)
+        id: health
+        run: |
+          for i in $(seq 1 30); do
+            STATUS=$(gcloud compute ssh ${{ env.VM_NAME }} --zone ${{ env.ZONE }} --command \
+              "curl -sf http://localhost:8000/healthz" 2>/dev/null) && {
+              echo "Healthy after attempt $i"
+              echo "healthy=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            }
+            echo "Attempt $i/30 failed, waiting 3s..."
+            sleep 3
+          done
+          echo "healthy=false" >> "$GITHUB_OUTPUT"
+          exit 1
+
+      - name: Rollback on failure
+        if: failure() && steps.health.outputs.healthy == 'false'
+        run: |
+          echo "::error::Health check failed. Rolling back to previous version."
+          gcloud compute ssh ${{ env.VM_NAME }} --zone ${{ env.ZONE }} --command "
+            sudo docker tag occdesk-api:rollback occdesk-api:m4
+            sudo docker tag occdesk-worker:rollback occdesk-worker:m4
+            cd ${{ env.DEPLOY_DIR }}
+            sudo docker compose -f ops/vm/docker-compose.m4.yml up -d --force-recreate
+            for i in \$(seq 1 15); do
+              curl -sf http://localhost:8000/healthz && echo 'Rollback healthy' && exit 0
+              sleep 3
+            done
+            echo 'Rollback also failed' >&2
+            exit 1
+          "
+
+      - name: Promote current tag
+        if: success()
+        run: |
+          gcloud compute ssh ${{ env.VM_NAME }} --zone ${{ env.ZONE }} --command "
+            sudo docker tag occdesk-api:m4 occdesk-api:current
+            sudo docker tag occdesk-worker:m4 occdesk-worker:current
+            sudo rm -rf ${{ env.DEPLOY_DIR }}/prev
+            sudo mv ${{ env.DEPLOY_DIR }}/current ${{ env.DEPLOY_DIR }}/prev 2>/dev/null || true
+            sudo mv ${{ env.DEPLOY_DIR }}/new ${{ env.DEPLOY_DIR }}/current
+          "
+
+      - name: Readiness check
+        if: success()
+        run: |
+          gcloud compute ssh ${{ env.VM_NAME }} --zone ${{ env.ZONE }} --command "
+            curl -sf http://localhost:8000/readyz | python3 -m json.tool
+          "
+
+      - name: Deploy summary
+        if: always()
+        run: |
+          echo "### Deploy Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Previous | \`${{ steps.previous.outputs.tag }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Health | \`${{ steps.health.outputs.healthy || 'unknown' }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | \`${{ job.status }}\` |" >> "$GITHUB_STEP_SUMMARY"

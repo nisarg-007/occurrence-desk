@@ -1,0 +1,63 @@
+# M6 production stack: everything from M4 plus Caddy for HTTPS and fault injection for demo.
+name: occdesk-m6
+
+x-environment: &environment
+  APP_ENV: prod
+  STORAGE_BACKEND: gcs
+  S3_BUCKET: occdesk-docs-occurrence-desk-2893
+  SECRETS_BACKEND: gcp
+  GCP_PROJECT: occurrence-desk-2893
+  OCCDESK_REPO: sql
+  OCCDESK_WORKER_STORE: sql
+  SQS_ENDPOINT_URL: http://elasticmq:9324
+  SQS_QUEUE_URL: http://elasticmq:9324/000000000000/occdesk-dev-parse
+  SQS_DLQ_URL: http://elasticmq:9324/000000000000/occdesk-dev-parse-dlq
+  AWS_REGION: us-east-1
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_EC2_METADATA_DISABLED: "true"
+  LOG_LEVEL: INFO
+  ALLOW_FAULT_INJECTION: "${ALLOW_FAULT_INJECTION:-0}"
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/api.Dockerfile
+      target: runtime
+    image: occdesk-api:m4
+    environment: *environment
+    command: ["python", "-m", "infra.local.api_entry"]
+    expose: ["8000"]
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/worker.Dockerfile
+    image: occdesk-worker:m4
+    environment: *environment
+    init: true
+    stop_grace_period: 60s
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  default:
+    name: occurrence-desk_default
+    external: true

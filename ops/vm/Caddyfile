@@ -1,0 +1,19 @@
+{
+	# Use the VM's public IP with nip.io for automatic HTTPS
+	# nip.io resolves <ip>.nip.io to <ip>, and Caddy gets a Let's Encrypt cert for it.
+	# Replace with your domain if you have one.
+}
+
+:443 {
+	tls internal
+	reverse_proxy api:8000
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+	}
+}
+
+:80 {
+	redir https://{host}{uri} permanent
+}

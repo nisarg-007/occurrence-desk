@@ -65,6 +65,10 @@ async def request_context(request: Request, call_next):
         method=request.method, route=metrics.route_of(request), status=response.status_code
     ).observe(duration_ms / 1000.0)
 
+    route = metrics.route_of(request)
+    if 500 <= response.status_code < 600:
+        metrics.http_5xx_total.labels(method=request.method, route=route).inc()
+
     import logging
 
     logging.getLogger("api.access").info(

@@ -32,6 +32,12 @@ documents_submitted = Counter(
     labelnames=("enqueued",),  # false == a duplicate submission collapsed by sha256
 )
 
+http_5xx_total = Counter(
+    "occdesk_http_5xx_errors_total",
+    "HTTP responses with status 500-599",
+    labelnames=("method", "route"),
+)
+
 build_info = Gauge("occdesk_build_info", "Build information", labelnames=("version",))
 
 
