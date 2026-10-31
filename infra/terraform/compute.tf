@@ -29,7 +29,7 @@ resource "google_compute_instance" "app" {
   }
 
   metadata = {
-    enable-oslogin = "TRUE"
+    enable-oslogin = "FALSE"
   }
 
   allow_stopping_for_update = true
