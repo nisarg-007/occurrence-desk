@@ -73,6 +73,7 @@ resource "google_monitoring_dashboard" "app" {
     displayName = "Occurrence Desk"
 
     mosaicLayout = {
+      columns = 12
       tiles = [
         {
           xPos   = 0

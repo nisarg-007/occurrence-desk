@@ -11,6 +11,8 @@ resource "google_compute_global_address" "private_services" {
   purpose       = "VPC_PEERING"
   address_type  = "INTERNAL"
   prefix_length = 20
+  address       = "192.168.64.0"
+  description   = "Private services access range for Cloud SQL"
   network       = data.google_compute_network.default.id
 }
 

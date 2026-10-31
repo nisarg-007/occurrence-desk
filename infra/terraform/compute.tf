@@ -11,12 +11,13 @@ resource "google_compute_instance" "app" {
     initialize_params {
       image = "projects/cos-cloud/global/images/family/cos-stable"
       size  = 30
-      type  = "pd-balanced"
+      type  = "pd-standard"
     }
   }
 
   network_interface {
-    network = data.google_compute_network.default.name
+    network    = data.google_compute_network.default.name
+    subnetwork = "default"
     access_config {
       # Ephemeral public IP
     }
