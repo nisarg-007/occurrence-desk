@@ -69,6 +69,12 @@ resource "google_monitoring_alert_policy" "http_5xx_alert" {
 # ---------- Monitoring dashboard ----------
 
 resource "google_monitoring_dashboard" "app" {
+  # The Monitoring API normalizes dashboard JSON (adds default scale, xPos,
+  # yPos, etag), which causes perpetual diffs. Ignore that server-side noise.
+  lifecycle {
+    ignore_changes = [dashboard_json]
+  }
+
   dashboard_json = jsonencode({
     displayName = "Occurrence Desk"
 
