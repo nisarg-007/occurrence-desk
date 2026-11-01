@@ -18,6 +18,10 @@ x-environment: &environment
   LOG_LEVEL: INFO
   ALLOW_FAULT_INJECTION: "${ALLOW_FAULT_INJECTION:-0}"
 
+# Ship container stdout (JSON logs) to Cloud Logging as resource.type=gce_instance.
+x-logging: &gcplogs
+  driver: gcplogs
+
 services:
   caddy:
     image: caddy:2-alpine
@@ -39,6 +43,7 @@ services:
       target: runtime
     image: occdesk-api:m4
     environment: *environment
+    logging: *gcplogs
     command: ["python", "-m", "infra.local.api_entry"]
     expose: ["8000"]
     restart: unless-stopped
@@ -49,6 +54,7 @@ services:
       dockerfile: infra/docker/worker.Dockerfile
     image: occdesk-worker:m4
     environment: *environment
+    logging: *gcplogs
     init: true
     stop_grace_period: 60s
     restart: unless-stopped

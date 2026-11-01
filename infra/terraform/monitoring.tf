@@ -4,9 +4,8 @@ resource "google_logging_metric" "http_5xx" {
   name   = "occdesk-http-5xx-errors"
   filter = <<-EOT
     resource.type="gce_instance"
-    jsonPayload.status>=500
-    jsonPayload.status<600
-    jsonPayload.service="api"
+    jsonPayload.message=~"service.: .api.,"
+    jsonPayload.message=~"status.: 5[0-9][0-9]"
   EOT
 
   metric_descriptor {
