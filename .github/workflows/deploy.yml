@@ -18,6 +18,10 @@ env:
   PUBLIC_HOST: 34.132.226.2.nip.io
   COMPOSE_FILE: ops/vm/docker-compose.m6.yml
 
+permissions:
+  contents: read
+  id-token: write
+
 concurrency:
   group: deploy-production
   cancel-in-progress: false
@@ -57,7 +61,8 @@ jobs:
       - id: auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: projects/638039823165/locations/global/workloadIdentityPools/gh-pool/providers/gh-provider
+          service_account: gh-deployer@occurrence-desk-2893.iam.gserviceaccount.com
 
       - uses: google-github-actions/setup-gcloud@v2
         with:
