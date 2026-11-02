@@ -395,7 +395,10 @@ def dashboard_fragment(
             )
         busiest_i = max(range(len(counts)), key=lambda i: counts[i]) if any(counts) else None
         if busiest_i is not None:
-            insights.append(f"{months[busiest_i]} was the busiest month in this window — {counts[busiest_i]} reports filed.")
+            insights.append(
+                f"{months[busiest_i]} was the busiest month in this window "
+                f"— {counts[busiest_i]} reports filed."
+            )
         unlinked = round(100 * sum(1 for r in rows if not r.best_link_confidence) / len(rows))
         if unlinked:
             insights.append(

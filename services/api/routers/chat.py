@@ -11,8 +11,8 @@ than silently producing hallucinated answers.
 
 from __future__ import annotations
 
-import json
 import datetime as dt
+import json
 from typing import Any
 
 import httpx
@@ -58,8 +58,9 @@ def _build_db_context(repo: Any) -> tuple[str, int]:
     rows = repo.list_reports(cursor=None, page_size=5000)
 
     # Priority distribution
-    from services.api import presentation
     from collections import Counter
+
+    from services.api import presentation
 
     priorities = [repo.priority(r) for r in rows]
     band_counts = Counter(presentation.level(v)[1] for v in priorities)
@@ -139,7 +140,11 @@ async def chat(
         )
 
     if resp.status_code == 401:
-        raise ApiProblem(502, "Groq API auth failed", "Check your AI_CHAT_KEY — it must be a valid Groq API key (gsk_…).")
+        raise ApiProblem(
+            502,
+            "Groq API auth failed",
+            "Check your AI_CHAT_KEY — it must be a valid Groq API key (gsk_…).",
+        )
     if resp.status_code == 429:
         raise ApiProblem(429, "Groq rate limit reached", "Please wait a moment and try again.")
     if resp.status_code >= 400:

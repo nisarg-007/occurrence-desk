@@ -23,12 +23,14 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg://occdesk:occdesk@localhost:5432/occdesk"
 
-    storage_backend: str = "s3"  # "s3" (MinIO / AWS S3) or "gcs" (Google Cloud Storage via the VM service account)
+    # "s3" (MinIO / AWS S3) or "gcs" (Google Cloud Storage via the VM service account)
+    storage_backend: str = "s3"
     secrets_backend: str = "env"  # "env" or "gcp" (Secret Manager, see services/common/secrets.py)
     gcp_project: str = ""  # project that holds the secrets when secrets_backend is "gcp"
 
     s3_endpoint_url: str | None = None  # empty on AWS
-    s3_public_endpoint_url: str | None = None  # browser-facing host for presigned URLs; falls back to s3_endpoint_url
+    # browser-facing host for presigned URLs; falls back to s3_endpoint_url
+    s3_public_endpoint_url: str | None = None
     s3_bucket: str = "occdesk-dev-docs"
 
     sqs_endpoint_url: str | None = None  # empty on AWS
@@ -49,9 +51,11 @@ class Settings(BaseSettings):
 
     queue_stats_cache_seconds: int = 5
 
-    ai_chat_key: str = ""  # xAI / Grok API key — set via GROK_API_KEY env var (never commit a real key)
+    # xAI / Grok API key — set via GROK_API_KEY env var (never commit a real key)
+    ai_chat_key: str = ""
 
-    webhook_url: str = ""  # Slack incoming-webhook URL for critical-priority alerts (never commit a real one)
+    # Slack incoming-webhook URL for critical-priority alerts (never commit a real one)
+    webhook_url: str = ""
 
     @property
     def is_local(self) -> bool:
