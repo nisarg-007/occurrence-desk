@@ -88,6 +88,13 @@ jobs:
           gcloud compute scp /tmp/src.tgz ${{ env.VM_NAME }}:/tmp/src.tgz \
             --zone ${{ env.ZONE }} --tunnel-through-iap
 
+      - name: Tag previous images as rollback
+        run: |
+          gcloud compute ssh ${{ env.VM_NAME }} --zone ${{ env.ZONE }} --tunnel-through-iap --quiet --command "
+            sudo docker tag occdesk-api:m4 occdesk-api:rollback || true
+            sudo docker tag occdesk-worker:m4 occdesk-worker:rollback || true
+          " 2>/dev/null
+
       - name: Build images on VM
         run: |
           gcloud compute ssh ${{ env.VM_NAME }} --zone ${{ env.ZONE }} --tunnel-through-iap --command "
@@ -99,14 +106,6 @@ jobs:
             sudo docker compose -f ${{ env.COMPOSE_FILE }} build --build-arg APP_VERSION=${{ github.sha }}
             sudo docker tag occdesk-api:m4 occdesk-api:${{ github.sha }}
             sudo docker tag occdesk-worker:m4 occdesk-worker:${{ github.sha }}
-          "
-
-      - name: Tag previous images as rollback
-        run: |
-          gcloud compute ssh ${{ env.VM_NAME }} --zone ${{ env.ZONE }} --tunnel-through-iap --command "
-            set -e
-            sudo docker tag \$(sudo docker inspect -f '{{.Image}}' occdesk-m6-api-1) occdesk-api:rollback
-            sudo docker tag \$(sudo docker inspect -f '{{.Image}}' occdesk-m6-worker-1) occdesk-worker:rollback
           "
 
       - name: Cut over to new images
