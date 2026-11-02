@@ -68,11 +68,16 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
+      - name: Prepare SSH key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keygen -q -t rsa -b 3072 -N "" -f ~/.ssh/google_compute_engine
+
       - name: Record currently deployed version (for rollback summary)
         id: previous
         run: |
-          PREV=$(gcloud compute ssh ${{ env.VM_NAME }} --zone ${{ env.ZONE }} --tunnel-through-iap --command \
-            "sudo docker inspect occdesk-m6-api-1 --format='{{.Image}}' 2>/dev/null | cut -c1-19 || echo none")
+          PREV=$(gcloud compute ssh ${{ env.VM_NAME }} --zone ${{ env.ZONE }} --tunnel-through-iap --quiet --command \
+            "sudo docker inspect occdesk-m6-api-1 --format='{{.Image}}' 2>/dev/null | cut -c1-19 || echo none" 2>/dev/null | tail -n 1)
           echo "tag=${PREV:-none}" >> "$GITHUB_OUTPUT"
 
       - name: Upload source to VM (IAP tunnel)
