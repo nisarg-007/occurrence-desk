@@ -84,7 +84,8 @@ jobs:
         run: |
           tar --exclude=.git --exclude=.venv --exclude='.env*' --exclude=data \
             --exclude=tests/e2e/fixtures --exclude=__pycache__ --exclude=.pytest_cache \
-            --exclude=.ruff_cache --exclude=.mypy_cache -czf /tmp/src.tgz .
+            --exclude=.ruff_cache --exclude=.mypy_cache --exclude='gha-creds-*.json' \
+            -czf /tmp/src.tgz .
           gcloud compute scp /tmp/src.tgz ${{ env.VM_NAME }}:/tmp/src.tgz \
             --zone ${{ env.ZONE }} --tunnel-through-iap
 
