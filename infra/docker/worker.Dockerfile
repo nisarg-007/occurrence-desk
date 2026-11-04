@@ -10,6 +10,8 @@ RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --create-home app
 WORKDIR /app
 COPY --from=dependencies /opt/venv /opt/venv
 COPY --chown=app:app . .
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
 USER app
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=4 CMD ["python", "-m", "infra.local.health", "worker"]
 CMD ["python", "-m", "infra.local.worker_entry"]
