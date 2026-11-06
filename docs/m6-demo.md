@@ -18,5 +18,5 @@ Before recording: VM is RUNNING, `/healthz` returns 200, Cloud Shell open in the
 Notes
 - Each presenter's face must be on camera during their part. Audio-only narration is not accepted.
 - Do the push in step 11:00 with a visible change, so the SHA before and after differs. Then the rollback step proves the previous version serves.
-- Upload the full video to OneDrive. Share view or edit access with the three instructor emails listed in the Canvas assignment. Submit the OneDrive link in Canvas.
+- Upload the full video to OneDrive. Share view or edit access with sdesini@cougarnet.uh.edu, krajan@cougarnet.uh.edu and skolanu@cougarnet.uh.edu. Submit the OneDrive link in Canvas.
 - Submit the repo link, screenshots (dashboard, alert policy, received alert), the `terraform plan` output, the metric definition, and the run links for the green and the rolled-back pipeline.
