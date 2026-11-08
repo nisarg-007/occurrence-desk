@@ -1,12 +1,6 @@
-{
-	# Use the VM's public IP with nip.io for automatic HTTPS
-	# nip.io resolves <ip>.nip.io to <ip>. The site address must be the hostname so
-	# Caddy can serve a certificate for the SNI name (tls internal = Caddy local CA).
-	# Replace with your domain if you have one.
-}
-
+# Caddy obtains and renews a publicly trusted certificate for this hostname.
+# Keep /data persistent so certificates and ACME account keys survive deployments.
 34.132.226.2.nip.io {
-	tls internal
 	reverse_proxy api:8000
 	header {
 		Strict-Transport-Security "max-age=63072000; includeSubDomains"
